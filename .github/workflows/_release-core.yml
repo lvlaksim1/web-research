@@ -123,7 +123,10 @@ jobs:
           VERIFY_DIR="$RUNNER_TEMP/release-verify"
 
           read_tag_sha() {
-            gh api "/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true
+            TAG_JSON=""
+            if TAG_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" 2>/dev/null); then
+              printf '%s' "$TAG_JSON" | jq -r '.object.sha // empty'
+            fi
           }
 
           delete_matching_tag() {
@@ -153,8 +156,8 @@ jobs:
             test "$REMOTE_SHA256" = "$EXPECTED_SHA256"
           }
 
-          EXISTING_RELEASE=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>/dev/null || true)
-          if [ -n "$EXISTING_RELEASE" ]; then
+          EXISTING_RELEASE=""
+          if EXISTING_RELEASE=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>/dev/null); then
             EXISTING_DRAFT=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.draft')
             EXISTING_TARGET=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.target_commitish')
             EXISTING_ID=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.id // empty')
