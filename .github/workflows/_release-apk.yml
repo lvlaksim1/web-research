@@ -28,7 +28,7 @@ on:
 
 jobs:
   prepare-release:
-    uses: ./.github/workflows/_release-core.yml
+    uses: $/.github/workflows/_release-core.yml
     with:
       mode: prepare
 
@@ -91,7 +91,7 @@ jobs:
 
       - name: Build project APK candidate
         id: project-build
-        uses: ./.github/actions/build-apk
+        uses: $/.github/actions/build-apk
         with:
           release_number: ${{ steps.metadata.outputs.release_number }}
 
@@ -195,7 +195,7 @@ jobs:
   publish:
     if: ${{ inputs.mode == 'release' }}
     needs: build-sign-verify
-    uses: ./.github/workflows/_release-core.yml
+    uses: $/.github/workflows/_release-core.yml
     with:
       mode: publish
       project_name: ${{ inputs.project_name }}
