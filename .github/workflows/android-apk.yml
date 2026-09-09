@@ -45,29 +45,19 @@ jobs:
       - name: Send APK link to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
-            echo "TELEGRAM_BOT_TOKEN is not configured"
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram secrets are not configured"
             exit 1
           fi
           API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
-          WEBHOOK_URL=$(curl --silent --show-error --fail-with-body "$API/getWebhookInfo" | jq -r '.result.url // empty')
-          if [ -n "$WEBHOOK_URL" ]; then
-            echo "Telegram bot has an active webhook; automatic chat_id discovery via getUpdates is unavailable"
-            exit 1
-          fi
-          UPDATES=$(curl --silent --show-error --fail-with-body "$API/getUpdates?timeout=0")
-          CHAT_ID=$(printf '%s' "$UPDATES" | jq -r '[.result[] | select(.message.chat.type == "private") | .message.chat.id] | last // empty')
-          if [ -z "$CHAT_ID" ]; then
-            echo "No private Telegram chat found. Send /start or any message to the bot before the next release."
-            exit 1
-          fi
           APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/web-research-${RELEASE_TAG}.apk"
           TEXT="web-research ${RELEASE_TAG} собран успешно.\n\nСкачать APK:\n${APK_URL}"
-          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${CHAT_ID}" --data-urlencode "text=${TEXT}")
+          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
           printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
           echo "Telegram notification sent"
       - name: Delete completed Actions artifacts
