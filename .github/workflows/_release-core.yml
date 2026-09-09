@@ -181,7 +181,7 @@ jobs:
           echo "Published and verified GitHub Release $RELEASE_TAG"
 
       - name: Clean current run Actions artifacts
-        if: always()
+        if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
