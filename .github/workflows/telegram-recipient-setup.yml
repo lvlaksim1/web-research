@@ -1,0 +1,40 @@
+name: Telegram recipient setup
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture recipient and send v3 test
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+
+          ME=$(curl --silent --show-error --fail-with-body "$API/getMe")
+          USERNAME=$(printf '%s' "$ME" | jq -r '.result.username // empty')
+          if [ "$USERNAME" != "zo_bot" ]; then
+            echo "Unexpected bot: @$USERNAME"
+            exit 1
+          fi
+
+          UPDATES=$(curl --silent --show-error --fail-with-body "$API/getUpdates?timeout=0")
+          CHAT_ID=$(printf '%s' "$UPDATES" | jq -r '[.result[] | select(.message.chat.type == "private") | .message.chat.id] | last // empty')
+          if [ -z "$CHAT_ID" ]; then
+            echo "No private chat update found"
+            exit 1
+          fi
+
+          ENCRYPTED_CHAT_ID=$(printf '%s' "$CHAT_ID" | openssl enc -aes-256-cbc -pbkdf2 -salt -a -A -pass env:TELEGRAM_BOT_TOKEN)
+          echo "ENCRYPTED_CHAT_ID=$ENCRYPTED_CHAT_ID"
+
+          APK_URL="https://github.com/lvlaksim1/web-research/releases/download/v3/web-research-v3.apk"
+          TEXT="web-research v3\n\nСкачать APK:\n$APK_URL"
+          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=$CHAT_ID" --data-urlencode "text=$TEXT")
+          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
+          echo "TEST_MESSAGE_SENT=true"
