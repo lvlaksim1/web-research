@@ -28,35 +28,6 @@ jobs:
           NEXT=$((LAST + 1))
           echo "number=$NEXT" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
-      - name: Restore verified stable signing key
-        shell: bash
-        run: |
-          git fetch --no-tags origin 252ce689513ef734862000c3e97843a15f018840
-          python3 - <<'PY'
-          import base64
-          import subprocess
-
-          ref = "252ce689513ef734862000c3e97843a15f018840"
-          text = subprocess.check_output(
-              ["git", "show", f"{ref}:.github/workflows/android-apk.yml"],
-              text=True,
-          )
-          prefix = "echo '"
-          suffix = "' | base64 -d > webresearch.keystore"
-          matches = []
-          for raw in text.splitlines():
-              line = raw.strip()
-              if line.startswith(prefix) and line.endswith(suffix):
-                  matches.append(line)
-          if len(matches) != 1:
-              raise SystemExit(f"Expected one stable signing key in {ref}, found {len(matches)}")
-          encoded = matches[0][len(prefix):-len(suffix)]
-          data = base64.b64decode(encoded, validate=True)
-          with open("webresearch.keystore", "wb") as stream:
-              stream.write(data)
-          print(f"Restored verified stable signing keystore: {len(data)} bytes")
-          PY
-          keytool -list -keystore webresearch.keystore -storepass webresearch -alias webresearch >/dev/null
       - name: Build APK
         env:
           WEB_RESEARCH_VERSION: v${{ steps.version.outputs.number }}
