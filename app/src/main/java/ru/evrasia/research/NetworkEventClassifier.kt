@@ -26,7 +26,6 @@ internal object NetworkEventClassifier {
     fun responseKind(event: JSONObject): String {
         if (isActionEvent(event)) return "ACTION"
         if (isRealtimeSession(event)) return "OTHER"
-        if (isEndpointGroup(event)) return event.optString("_groupKind", "OTHER")
         if (event.optString("source", "") in setOf("js-file", "script-archive", "source-map")) return "JS"
 
         val headers = event.optJSONObject("responseHeaders")
@@ -72,7 +71,6 @@ internal object NetworkEventClassifier {
         .ifBlank { event.optString("page", event.optString("newURL", "")) }
 
     fun methodOf(event: JSONObject): String {
-        if (isEndpointGroup(event)) return event.optString("_groupMethod", "OTHER")
         if (isRealtimeSession(event)) return event.optString("_realtimeProtocol", "OTHER")
         val source = event.optString("source", "")
         if (source.startsWith("websocket")) return "WS"
@@ -86,8 +84,6 @@ internal object NetworkEventClassifier {
     fun hasRequestBody(event: JSONObject): Boolean = event.optString("requestBody", "").isNotBlank()
 
     fun isRealtimeSession(event: JSONObject): Boolean = event.optBoolean("_realtimeSession", false)
-
-    fun isEndpointGroup(event: JSONObject): Boolean = event.optBoolean("_endpointGroup", false)
 
     fun isApiRelevant(event: JSONObject): Boolean {
         if (isActionEvent(event) || isRealtimeSession(event)) return true
@@ -106,7 +102,7 @@ internal object NetworkEventClassifier {
         "websocket-open", "websocket-send", "websocket-receive", "sse-open", "sse-message", "beacon", "js-file", "script-archive", "replay"
     )
 
-    fun isRequestEvent(event: JSONObject): Boolean = isPlainRequestEvent(event) || isRealtimeSession(event) || isEndpointGroup(event)
+    fun isRequestEvent(event: JSONObject): Boolean = isPlainRequestEvent(event) || isRealtimeSession(event)
 
     fun isActionEvent(event: JSONObject): Boolean = event.optString("source", "") == "user-action"
 

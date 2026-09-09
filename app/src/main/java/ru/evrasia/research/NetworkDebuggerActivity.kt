@@ -73,8 +73,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     private lateinit var counter: TextView
     private lateinit var recordButton: Button
     private lateinit var mergeButton: Button
-    private lateinit var apiButton: Button
-    private lateinit var endpointButton: Button
     private lateinit var domainSpinner: Spinner
     private lateinit var typeSpinner: Spinner
     private lateinit var methodSpinner: Spinner
@@ -91,8 +89,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private var lastRevision = -1L
     private var mergeMode = false
-    private var apiOnly = false
-    private var endpointMode = false
     private var pendingBinary: ByteArray? = null
     private var pendingBinaryName = "response.bin"
     private var pendingBinaryMime = "application/octet-stream"
@@ -168,7 +164,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             val event = items[position]
             when {
                 isActionEvent(event) -> Unit
-                isEndpointGroup(event) -> showEndpointGroup(event)
                 isRealtimeSession(event) -> showRealtimeSession(event)
                 else -> showDetails(event, search.text.toString().trim())
             }
@@ -304,18 +299,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         content.addView(popupRow(if (mergeMode) "Объединено ✓" else "Раздельно", mergeMode) {
             mergeMode = !mergeMode
             updateMergeButton()
-            applyFilters()
-            popup?.dismiss()
-        })
-        content.addView(popupRow(if (apiOnly) "API ✓" else "API", apiOnly) {
-            apiOnly = !apiOnly
-            updateApiButton()
-            applyFilters()
-            popup?.dismiss()
-        })
-        content.addView(popupRow(if (endpointMode) "ENDPOINT ✓" else "ENDPOINT", endpointMode) {
-            endpointMode = !endpointMode
-            updateEndpointButton()
             applyFilters()
             popup?.dismiss()
         })
@@ -458,19 +441,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateApiButton(){
-        if(::apiButton.isInitialized){
-            apiButton.text=if(apiOnly)"API ✓" else "API"
-            apiButton.setTextColor(if(apiOnly)cyan else textColor)
-        }
-    }
-
-    private fun updateEndpointButton(){
-        if(::endpointButton.isInitialized){
-            endpointButton.text=if(endpointMode)"ENDPOINT ✓" else "ENDPOINT"
-            endpointButton.setTextColor(if(endpointMode)amber else textColor)
-        }
-    }
 
     private fun selected(spinner:Spinner, fallback:String):String =
         if(spinner.selectedItem!=null) spinner.selectedItem.toString() else fallback
@@ -553,20 +523,19 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             val typeOk=type=="ALL"||(action&&type=="OTHER")||(!action&&responseKind(event)==type)
             val methodValue=methodOf(event)
             val methodOk=method=="ALL"||methodValue==method||(method=="OTHER"&&methodValue !in methodFilters)
-            val apiOk=!apiOnly||isApiRelevant(event)
             val searchOk=q.isBlank()||event.toString().contains(q,true)
-            domainOk&&typeOk&&methodOk&&apiOk&&searchOk
+            domainOk&&typeOk&&methodOk&&searchOk
         }
 
         items.clear()
-        items.addAll(if(endpointMode)groupEndpoints(filtered) else filtered)
+        items.addAll(filtered)
         adapter.notifyDataSetChanged()
 
         val requests=sessions.count{isRequestEvent(it)}
         val actions=sessions.count{isActionEvent(it)}
         val errors=sessions.count{it.has("error")||it.optInt("status",0)>=400}
         val prefix=if(mergeMode)"${allItems.size} событий → ${base.size} строк" else "${allItems.size} событий"
-        val filteredFlag=domain!="Все домены"||type!="ALL"||method!="ALL"||apiOnly||q.isNotBlank()||endpointMode
+        val filteredFlag=domain!="Все домены"||type!="ALL"||method!="ALL"||q.isNotBlank()
         counter.text="$prefix · $requests запросов · $actions действий · $errors ошибок${if(filteredFlag)" · показано ${items.size}" else ""}"
     }
 
@@ -657,12 +626,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private fun isRealtimeSession(event:JSONObject) = NetworkEventClassifier.isRealtimeSession(event)
 
-    private fun groupEndpoints(source:List<JSONObject>):List<JSONObject> = NetworkEndpointAnalyzer.group(source)
-
-    private fun isEndpointGroup(event:JSONObject) = NetworkEventClassifier.isEndpointGroup(event)
-
-    private fun normalizeEndpoint(raw:String):String = NetworkEndpointAnalyzer.normalize(raw)
-
     private fun responseKind(event:JSONObject):String = NetworkEventClassifier.responseKind(event)
 
     private fun eventLocation(event:JSONObject):String = NetworkEventClassifier.eventLocation(event)
@@ -687,15 +650,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     }
 
     private fun rowFlags(event:JSONObject):String=buildList{
-        if(isEndpointGroup(event)){
-            val arr=event.optJSONArray("_groupEvents")
-            if(arr!=null){
-                var changed=false
-                for(i in 0 until arr.length())if(changedIds.contains(eventIdentity(arr.optJSONObject(i)?:continue)))changed=true
-                if(changed)add("CHANGED")
-            }
-            return@buildList
-        }
         if(isRealtimeSession(event))return@buildList
         if(eventSources(event).size>1)add(if(event.optString("_mergeConfidence")=="MEDIUM")"~MERGE" else "✓MERGE")
         if(hasRequestBody(event))add("BODY")
@@ -706,8 +660,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         if(event.optString("source","")=="replay")add("REPLAY")
     }.joinToString("  ")
 
-    private fun isApiRelevant(event:JSONObject):Boolean = NetworkEventClassifier.isApiRelevant(event)
-
     private fun isPlainRequestEvent(event:JSONObject):Boolean = NetworkEventClassifier.isPlainRequestEvent(event)
 
     private fun isRequestEvent(event:JSONObject):Boolean = NetworkEventClassifier.isRequestEvent(event)
@@ -717,30 +669,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     private fun isJsEvent(event:JSONObject):Boolean = NetworkEventClassifier.isJsEvent(event)
 
     private fun hostOf(url:String):String? = NetworkEventClassifier.hostOf(url)
-
-    private fun showEndpointGroup(group:JSONObject){
-        val arr=group.optJSONArray("_groupEvents")?:return
-        val dialog=Dialog(this)
-        dialog.setCancelable(true)
-        dialog.setCanceledOnTouchOutside(false)
-        val root=toolDialogRoot(dialog,"${group.optString("_groupMethod")} ${group.optString("url")} ×${arr.length()}")
-        val body=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        for(i in 0 until arr.length()){
-            val e=arr.optJSONObject(i)?:continue
-            val label=buildString{
-                append(if(e.has("time"))listTime(e.optLong("time")) else "--:--:--.---")
-                append("  ").append(methodOf(e))
-                if(e.optInt("status",0)>0)append("  ").append(e.optInt("status"))
-                if(e.has("duration"))append("  ").append(formatDuration(e.optDouble("duration",0.0)))
-                append("\n").append(e.optString("url",""))
-            }
-            body.addView(Button(this).apply{
-                text=label;isAllCaps=false;gravity=Gravity.START or Gravity.CENTER_VERTICAL;setTextColor(textColor);textSize=10f;typeface=Typeface.MONOSPACE;minHeight=0;minimumHeight=0;setPadding(dp(10),dp(7),dp(10),dp(7));background=rounded(panel2,9f,line);setOnClickListener{dialog.dismiss();showDetails(e,search.text.toString().trim())}
-            },LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,dp(3),0,dp(3))})
-        }
-        root.addView(ScrollView(this).apply{addView(body)},LinearLayout.LayoutParams(-1,0,1f))
-        showToolDialog(dialog,root,.96f,.86f)
-    }
 
     private fun showRealtimeSession(session:JSONObject){
         val arr=session.optJSONArray("_sessionEvents")?:return
@@ -1294,10 +1222,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             }
 
             row.background=rounded(panel,8f,Color.rgb(26,48,39));kind.visibility=View.VISIBLE
-            if(isEndpointGroup(event)){
-                val whenText=if(event.has("time"))listTime(event.optLong("time")) else "--:--:--.---";top.text="$whenText  ${methodOf(event)}  ×${event.optInt("_groupCount",0)}  · endpoint";top.setTextColor(amber);kind.text="GROUP";kind.setTextColor(amber);url.text=event.optString("url","—");url.setTextColor(textColor);val flags=rowFlags(event);flagsView.text=flags;flagsView.visibility=if(flags.isBlank())View.GONE else View.VISIBLE;flagsView.setTextColor(amber);return row
-            }
-
             if(isRealtimeSession(event)){
                 val whenText=if(event.has("time"))listTime(event.optLong("time")) else "--:--:--.---";top.text="$whenText  ${methodOf(event)}  · ${event.optInt("_sessionCount",0)} событий";top.setTextColor(cyan);kind.text=methodOf(event);kind.setTextColor(cyan);url.text=event.optString("url","—");url.setTextColor(muted);flagsView.visibility=View.GONE;return row
             }
