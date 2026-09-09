@@ -19,6 +19,7 @@ import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -61,6 +62,7 @@ class WebResearchV10Activity : AppCompatActivity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var address: EditText
     private lateinit var pageAction: Button
+    private lateinit var zipButton: Button
     private lateinit var menuButton: Button
     private lateinit var networkButton: Button
     private lateinit var networkBadge: TextView
@@ -76,6 +78,9 @@ class WebResearchV10Activity : AppCompatActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var loading = false
     private var editingAddress = false
+    private var activeBrowserMenu: Dialog? = null
+    private var activeSheetDialog: Dialog? = null
+    private var activeSheetCloseButton: Button? = null
 
     @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -154,7 +159,7 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
         toolbar.addView(pageAction, LinearLayout.LayoutParams(dp(42), dp(46)).apply { marginStart = dp(5) })
 
-        val zipButton = Button(this).apply {
+        zipButton = Button(this).apply {
             tag = "browser-zip"
             text = "ZIP"
             contentDescription = "Экспорт ZIP"
@@ -331,7 +336,11 @@ class WebResearchV10Activity : AppCompatActivity() {
     }
 
     private fun showBrowserMenu() {
-        showBottomSheet("Меню") { dialog ->
+        activeBrowserMenu?.takeIf { it.isShowing }?.let {
+            it.dismiss()
+            return
+        }
+        activeBrowserMenu = showBottomSheet("Меню") { dialog ->
             addSection("СТРАНИЦА")
             addMenuRow("★", "Добавить в закладки", currentHost()) {
                 bookmarkController.save(currentPage())
@@ -341,7 +350,7 @@ class WebResearchV10Activity : AppCompatActivity() {
                 dialog.dismiss()
                 showBookmarksSheet()
             }
-            addSiteVersionRow()
+            addSiteVersionRow(dialog)
 
             addSection("ДАННЫЕ САЙТА")
             val cookieCount = cookieCount()
@@ -354,14 +363,9 @@ class WebResearchV10Activity : AppCompatActivity() {
                 confirmClearCookies(cookieCount)
             }
 
-            addSection("ИНТЕРФЕЙС")
-            addMenuRow("◐", "Тема", WebUiTheme.savedMode(this@WebResearchV10Activity).label) {
+            addMenuRow("◈", "Интерфейс", "Тема и цвет элементов") {
                 dialog.dismiss()
-                showThemePicker()
-            }
-            addMenuRow("●", "Цвет элементов", WebUiTheme.accentLabel(this@WebResearchV10Activity)) {
-                dialog.dismiss()
-                showAccentPicker()
+                showInterfaceMenu()
             }
 
             addSection("ПРИЛОЖЕНИЕ")
@@ -372,7 +376,7 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
     }
 
-    private fun LinearLayout.addSiteVersionRow() {
+    private fun LinearLayout.addSiteVersionRow(dialog: Dialog) {
         val container = LinearLayout(this@WebResearchV10Activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(9), dp(14), dp(10))
@@ -410,6 +414,7 @@ class WebResearchV10Activity : AppCompatActivity() {
                         button.background = rounded(if (selected) palette.accent else palette.address, 12f, if (selected) palette.accent else palette.divider)
                     }
                 }
+                dialog.dismiss()
             }
         }
         selector.addView(modeButton("Мобильная", false), LinearLayout.LayoutParams(0, dp(38), 1f))
@@ -540,6 +545,19 @@ class WebResearchV10Activity : AppCompatActivity() {
     }
 
 
+    private fun showInterfaceMenu() {
+        showBottomSheet("Интерфейс") { dialog ->
+            addMenuRow("◐", "Тема", WebUiTheme.savedMode(this@WebResearchV10Activity).label) {
+                dialog.dismiss()
+                showThemePicker()
+            }
+            addMenuRow("●", "Цвет элементов", WebUiTheme.accentLabel(this@WebResearchV10Activity)) {
+                dialog.dismiss()
+                showAccentPicker()
+            }
+        }
+    }
+
     private fun showThemePicker() {
         showBottomSheet("Тема") { dialog ->
             val current = WebUiTheme.savedMode(this@WebResearchV10Activity)
@@ -602,6 +620,7 @@ class WebResearchV10Activity : AppCompatActivity() {
         if (persist) WebUiTheme.saveAccentColor(this, opaque)
         palette = palette.copy(accent = opaque)
         if (::pageAction.isInitialized) pageAction.setTextColor(opaque)
+        if (::zipButton.isInitialized) zipButton.setTextColor(opaque)
         if (::menuButton.isInitialized) menuButton.foreground = TechIconDrawable(TechIconDrawable.Kind.MENU, opaque)
         if (::networkButton.isInitialized) networkButton.foreground = TechIconDrawable(TechIconDrawable.Kind.NETWORK, opaque)
         if (::networkBadge.isInitialized) {
@@ -610,6 +629,7 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
         if (::progress.isInitialized) progress.progressTintList = ColorStateList.valueOf(opaque)
         if (::swipeRefresh.isInitialized) swipeRefresh.setColorSchemeColors(opaque)
+        activeSheetCloseButton?.setTextColor(opaque)
     }
 
     private fun showAbout() {
@@ -624,10 +644,12 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
     }
 
-    private fun showBottomSheet(title: String, build: LinearLayout.(Dialog) -> Unit) {
+    private fun showBottomSheet(title: String, build: LinearLayout.(Dialog) -> Unit): Dialog {
         val dialog = Dialog(this)
         dialog.setCanceledOnTouchOutside(false)
         dialog.setCancelable(true)
+        activeSheetDialog = dialog
+
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(6), dp(12), dp(6), dp(16))
@@ -638,7 +660,7 @@ class WebResearchV10Activity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(6), dp(2), dp(8), dp(8))
         }
-        sheetHeader.addView(Button(this).apply {
+        val closeButton = Button(this).apply {
             text = "×"
             contentDescription = "Закрыть"
             setTextColor(palette.accent)
@@ -651,7 +673,9 @@ class WebResearchV10Activity : AppCompatActivity() {
             setPadding(0, 0, 0, 0)
             background = rounded(palette.address, 11f, palette.divider)
             setOnClickListener { dialog.dismiss() }
-        }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        }
+        activeSheetCloseButton = closeButton
+        sheetHeader.addView(closeButton, LinearLayout.LayoutParams(dp(40), dp(40)))
         sheetHeader.addView(TextView(this).apply {
             text = title
             setTextColor(palette.text)
@@ -662,10 +686,37 @@ class WebResearchV10Activity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(0, dp(40), 1f))
         panel.addView(sheetHeader)
         panel.build(dialog)
+
+        var swipeStartY = 0f
+        var swipeStartedAtTop = false
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             setBackgroundColor(Color.TRANSPARENT)
             addView(panel, ViewGroup.LayoutParams(-1, -2))
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        swipeStartY = event.rawY
+                        swipeStartedAtTop = scrollY == 0
+                        false
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        val closeBySwipe = swipeStartedAtTop && event.rawY - swipeStartY >= dp(72)
+                        swipeStartedAtTop = false
+                        if (closeBySwipe) {
+                            dialog.dismiss()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        swipeStartedAtTop = false
+                        false
+                    }
+                    else -> false
+                }
+            }
         }
         dialog.setContentView(scroll)
         dialog.setOnShowListener {
@@ -677,7 +728,15 @@ class WebResearchV10Activity : AppCompatActivity() {
                 attributes = attributes.apply { dimAmount = 0.35f }
             }
         }
+        dialog.setOnDismissListener {
+            if (activeSheetDialog === dialog) {
+                activeSheetDialog = null
+                activeSheetCloseButton = null
+            }
+            if (activeBrowserMenu === dialog) activeBrowserMenu = null
+        }
         dialog.show()
+        return dialog
     }
 
     private fun LinearLayout.addSection(label: String) {

@@ -188,7 +188,7 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         }
         addControl(recordButton)
         addControl(chromeButton("⌫", "Очистить журнал") {
-            showClearOptions()
+            showClearOptions(it)
         })
         menuButton = chromeButton("☰", "Меню") { showNetworkMenu(it) }
         controls.addView(menuButton, LinearLayout.LayoutParams(dp(44), dp(44)))
@@ -204,26 +204,35 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         refreshIncremental(force = true)
     }
 
-    private fun showClearOptions() {
-        AlertDialog.Builder(this)
-            .setTitle("Очистить")
-            .setItems(arrayOf("Журнал и данные ZIP", "Журнал, данные ZIP и все cookies")) { dialog, which ->
-                dialog.dismiss()
-                if (!NetworkRequestActions.clearFullSession(this)) NetworkDebugStore.clear()
-                refreshIncremental(force = true)
-                if (which == 1) {
-                    CookieManager.getInstance().removeAllCookies {
-                        CookieManager.getInstance().flush()
-                        runOnUiThread {
-                            Toast.makeText(this, "Журнал, данные ZIP и cookies очищены", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    Toast.makeText(this, "Журнал и данные текущего ZIP очищены", Toast.LENGTH_SHORT).show()
+    private fun showClearOptions(anchor: View) {
+        var popup: PopupWindow? = null
+        val content = popupPanel()
+        content.addView(popupHeader("Очистить журнал") { popup?.dismiss() })
+        content.addView(popupRow("Журнал и данные ZIP", false) {
+            popup?.dismiss()
+            clearLogData(clearCookies = false)
+        })
+        content.addView(popupRow("Журнал, данные ZIP и все cookies", false) {
+            popup?.dismiss()
+            clearLogData(clearCookies = true)
+        })
+        popup = buildPopup(content, 320)
+        showAboveRight(popup, content, anchor, 320)
+    }
+
+    private fun clearLogData(clearCookies: Boolean) {
+        if (!NetworkRequestActions.clearFullSession(this)) NetworkDebugStore.clear()
+        refreshIncremental(force = true)
+        if (clearCookies) {
+            CookieManager.getInstance().removeAllCookies {
+                CookieManager.getInstance().flush()
+                runOnUiThread {
+                    Toast.makeText(this, "Журнал, данные ZIP и cookies очищены", Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("Отмена", null)
-            .show()
+        } else {
+            Toast.makeText(this, "Журнал и данные текущего ZIP очищены", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun chromeButton(symbol: String, description: String, click: (View) -> Unit) = Button(this).apply {
