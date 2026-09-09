@@ -22,10 +22,6 @@ on:
       build_command:
         required: true
         type: string
-      version_name_env:
-        required: false
-        default: ""
-        type: string
       version_code_env:
         required: false
         default: ""
@@ -93,15 +89,11 @@ jobs:
       - name: Build unsigned release APK
         env:
           RELEASE_NUMBER: ${{ inputs.release_number }}
-          VERSION_NAME_ENV: ${{ inputs.version_name_env }}
           VERSION_CODE_ENV: ${{ inputs.version_code_env }}
           BUILD_COMMAND: ${{ inputs.build_command }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "$VERSION_NAME_ENV" ]; then
-            export "${VERSION_NAME_ENV}=v${RELEASE_NUMBER}"
-          fi
           if [ -n "$VERSION_CODE_ENV" ]; then
             export "${VERSION_CODE_ENV}=${RELEASE_NUMBER}"
           fi
