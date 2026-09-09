@@ -34,6 +34,7 @@ jobs:
   prepare:
     if: ${{ inputs.mode == 'prepare' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       requested: ${{ steps.gate.outputs.requested }}
       number: ${{ steps.version.outputs.number }}
@@ -73,6 +74,7 @@ jobs:
   publish:
     if: ${{ inputs.mode == 'publish' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Validate release inputs
         env:
@@ -103,7 +105,6 @@ jobs:
           test -s "$FILE"
           SHA256=$(sha256sum "$FILE" | awk '{print $1}')
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
-          printf '%s  %s\n' "$SHA256" "$ARTIFACT_FILENAME" > "${FILE}.sha256"
 
       - name: Publish verified GitHub Release
         env:
@@ -118,18 +119,15 @@ jobs:
 
           RELEASE_TAG="v${RELEASE_NUMBER}"
           FILE="release-artifact/${ARTIFACT_FILENAME}"
-          SHA_FILE="${FILE}.sha256"
           VERIFY_DIR="$RUNNER_TEMP/release-verify"
 
           verify_published_release() {
             rm -rf "$VERIFY_DIR"
             mkdir -p "$VERIFY_DIR"
-            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ARTIFACT_FILENAME" --pattern "${ARTIFACT_FILENAME}.sha256" --dir "$VERIFY_DIR"
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ARTIFACT_FILENAME" --dir "$VERIFY_DIR"
             test -s "$VERIFY_DIR/$ARTIFACT_FILENAME"
-            test -s "$VERIFY_DIR/${ARTIFACT_FILENAME}.sha256"
             REMOTE_SHA256=$(sha256sum "$VERIFY_DIR/$ARTIFACT_FILENAME" | awk '{print $1}')
             test "$REMOTE_SHA256" = "$EXPECTED_SHA256"
-            grep -Fq "$EXPECTED_SHA256  $ARTIFACT_FILENAME" "$VERIFY_DIR/${ARTIFACT_FILENAME}.sha256"
             IS_DRAFT=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')
             test "$IS_DRAFT" = "false"
           }
@@ -162,16 +160,11 @@ jobs:
           trap rollback_draft EXIT
 
           APK_ASSET_NAME=$(jq -rn --arg value "$ARTIFACT_FILENAME" '$value|@uri')
-          SHA_ASSET_NAME=$(jq -rn --arg value "${ARTIFACT_FILENAME}.sha256" '$value|@uri')
-
-          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/vnd.android.package-archive" --data-binary "@$FILE" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$APK_ASSET_NAME" >/dev/null
-          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: text/plain" --data-binary "@$SHA_FILE" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$SHA_ASSET_NAME" >/dev/null
+          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/octet-stream" --data-binary "@$FILE" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$APK_ASSET_NAME" >/dev/null
 
           ASSETS=$(gh api "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100")
           APK_OK=$(printf '%s' "$ASSETS" | jq --arg name "$ARTIFACT_FILENAME" '[.[] | select(.name == $name and .size > 0)] | length')
-          SHA_OK=$(printf '%s' "$ASSETS" | jq --arg name "${ARTIFACT_FILENAME}.sha256" '[.[] | select(.name == $name and .size > 0)] | length')
           test "$APK_OK" = "1"
-          test "$SHA_OK" = "1"
 
           gh api --method PATCH "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true >/dev/null
           PUBLISHED=true

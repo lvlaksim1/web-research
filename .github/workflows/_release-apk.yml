@@ -35,6 +35,7 @@ on:
 jobs:
   build-sign-verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     outputs:
       effective_release_number: ${{ steps.metadata.outputs.release_number }}
       apk_filename: ${{ steps.metadata.outputs.apk_filename }}
@@ -149,6 +150,31 @@ jobs:
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionCode='${RELEASE_NUMBER}'"
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionName='v${RELEASE_NUMBER}'"
 
+      - name: Verify APK native architecture
+        env:
+          RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t ABIS < <(unzip -Z1 "$RELEASE_APK_FILENAME" | awk -F/ '$1 == "lib" && NF >= 3 {print $2}' | sort -u)
+
+          if [ "${#ABIS[@]}" -eq 0 ]; then
+            echo "APK contains no native libraries; architecture-independent APK accepted"
+            exit 0
+          fi
+
+          printf 'Native ABIs: %s\n' "${ABIS[*]}"
+
+          if ! printf '%s\n' "${ABIS[@]}" | grep -Fxq 'arm64-v8a'; then
+            echo "APK does not contain required arm64-v8a native libraries"
+            exit 1
+          fi
+
+          if printf '%s\n' "${ABIS[@]}" | grep -Fvxq 'arm64-v8a'; then
+            echo "APK contains native ABI other than arm64-v8a"
+            exit 1
+          fi
+
       - name: Upload release APK artifact
         if: ${{ inputs.mode == 'release' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -177,12 +203,68 @@ jobs:
       release_number: ${{ needs.build-sign-verify.outputs.effective_release_number }}
       artifact_filename: ${{ needs.build-sign-verify.outputs.apk_filename }}
 
+  retain-apk-history:
+    if: ${{ inputs.mode == 'release' }}
+    needs:
+      - build-sign-verify
+      - publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Keep APKs only for current and previous releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_NUMBER: ${{ needs.build-sign-verify.outputs.effective_release_number }}
+        shell: bash
+        run: |
+          set +e
+          CURRENT_TAG="v${CURRENT_NUMBER}"
+
+          RELEASE_TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          if [ $? -ne 0 ]; then
+            echo "::warning::Could not list releases for APK retention cleanup"
+            exit 0
+          fi
+
+          TAGS=$(printf '%s\n' "$RELEASE_TAGS" | grep -E '^v[0-9]+$' || true)
+          PREVIOUS_NUMBER=$(printf '%s\n' "$TAGS" | sed 's/^v//' | awk -v current="$CURRENT_NUMBER" '$1 < current' | sort -n | tail -1)
+          PREVIOUS_TAG=""
+          if [ -n "$PREVIOUS_NUMBER" ]; then
+            PREVIOUS_TAG="v${PREVIOUS_NUMBER}"
+          fi
+
+          CLEANUP_FAILED=false
+          while read -r TAG; do
+            [ -z "$TAG" ] && continue
+            [ "$TAG" = "$CURRENT_TAG" ] && continue
+            [ -n "$PREVIOUS_TAG" ] && [ "$TAG" = "$PREVIOUS_TAG" ] && continue
+
+            ASSET_IDS=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]? | select(.name | endswith(".apk")) | .id')
+            if [ $? -ne 0 ]; then
+              CLEANUP_FAILED=true
+              continue
+            fi
+
+            while read -r ASSET_ID; do
+              [ -z "$ASSET_ID" ] && continue
+              if ! gh api --method DELETE "/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" >/dev/null; then
+                CLEANUP_FAILED=true
+              fi
+            done <<< "$ASSET_IDS"
+          done <<< "$TAGS"
+
+          if [ "$CLEANUP_FAILED" = "true" ]; then
+            echo "::warning::Release succeeded, but some old APK assets could not be deleted"
+          fi
+          exit 0
+
   telegram:
     if: ${{ inputs.mode == 'release' }}
     needs:
       - build-sign-verify
       - publish
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Send APK link to Telegram
         env:
