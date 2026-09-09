@@ -1,0 +1,19 @@
+name: Telegram token check
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Telegram bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+          curl --silent --show-error --fail-with-body "$API/getMe" | jq '{ok, id:.result.id, username:.result.username}'
+          curl --silent --show-error --fail-with-body "$API/getWebhookInfo" | jq '{ok, webhook_active:((.result.url // "") != ""), pending_update_count:(.result.pending_update_count // 0)}'
