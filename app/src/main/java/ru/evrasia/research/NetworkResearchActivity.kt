@@ -396,10 +396,6 @@ class NetworkResearchActivity : AppCompatActivity() {
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, 0) }
-        actions.addView(primaryButton("POSTMAN JSON") {
-            val cookies = if (url.startsWith("http")) CookieManager.getInstance().getCookie(url).orEmpty() else ""
-            copy("POSTMAN JSON", PostmanRequestExporter.build(event, method, cookies))
-        }, LinearLayout.LayoutParams(0, dp(46), 1f))
         actions.addView(secondaryButton("URL") { copy("URL", url) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(7) })
         root.addView(actions)
 

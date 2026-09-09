@@ -741,7 +741,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         val actionScroll=HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false}
         val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
         actions.addView(detailButton("cURL"){copyText("cURL",buildCurl(event))})
-        actions.addView(detailButton("POSTMAN JSON"){PostmanDelivery.deliver(this,PostmanRequestExporter.build(event,methodOf(event),requestCookies),url)})
         actions.addView(detailButton("REQUEST"){copyText("REQUEST",buildRequestText(event,requestCookies))})
         actions.addView(detailButton("REQ HEADERS"){copyText("REQUEST HEADERS",formatHeaders(requestHeadersList))})
         actions.addView(detailButton("RESPONSE"){copyText("RESPONSE",buildResponseCopy(event,requestCookies))})
