@@ -7,7 +7,7 @@ android {
         applicationId = "web.research"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
+        versionCode = (System.getenv("WEB_RESEARCH_VERSION_CODE") ?: "1").toInt()
         versionName = System.getenv("WEB_RESEARCH_VERSION") ?: "dev"
     }
     compileOptions {
