@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: write
 jobs:
   build:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
@@ -34,10 +35,6 @@ jobs:
         run: gradle :app:assembleDebug
       - name: Rename APK
         run: cp app/build/outputs/apk/debug/app-debug.apk web-research-v${{ steps.version.outputs.number }}.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-research-v${{ steps.version.outputs.number }}
-          path: web-research-v${{ steps.version.outputs.number }}.apk
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -45,3 +42,13 @@ jobs:
           name: web research v${{ steps.version.outputs.number }}
           files: web-research-v${{ steps.version.outputs.number }}.apk
           make_latest: true
+      - name: Delete completed Actions artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r ARTIFACT_ID; do
+            [ -z "$ARTIFACT_ID" ] && continue
+            gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+          done
