@@ -35,8 +35,6 @@ jobs:
     if: ${{ inputs.mode == 'prepare' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: read
     outputs:
       requested: ${{ steps.gate.outputs.requested }}
       number: ${{ steps.version.outputs.number }}
@@ -78,9 +76,6 @@ jobs:
     if: ${{ inputs.mode == 'publish' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: write
-      actions: write
     steps:
       - name: Validate release inputs
         env:
