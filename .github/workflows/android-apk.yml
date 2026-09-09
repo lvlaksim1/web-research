@@ -1,0 +1,76 @@
+name: Build Android APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Determine next release version
+        id: version
+        shell: bash
+        run: |
+          git fetch --tags --force
+          LAST=$(git tag -l 'v[0-9]*' | sed 's/^v//' | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -z "$LAST" ]; then LAST=0; fi
+          NEXT=$((LAST + 1))
+          echo "number=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+      - name: Restore verified stable signing key
+        shell: bash
+        run: |
+          git fetch --no-tags origin 252ce689513ef734862000c3e97843a15f018840
+          python3 - <<'PY'
+          import base64
+          import subprocess
+
+          ref = "252ce689513ef734862000c3e97843a15f018840"
+          text = subprocess.check_output(
+              ["git", "show", f"{ref}:.github/workflows/android-apk.yml"],
+              text=True,
+          )
+          prefix = "echo '"
+          suffix = "' | base64 -d > webresearch.keystore"
+          matches = []
+          for raw in text.splitlines():
+              line = raw.strip()
+              if line.startswith(prefix) and line.endswith(suffix):
+                  matches.append(line)
+          if len(matches) != 1:
+              raise SystemExit(f"Expected one stable signing key in {ref}, found {len(matches)}")
+          encoded = matches[0][len(prefix):-len(suffix)]
+          data = base64.b64decode(encoded, validate=True)
+          with open("webresearch.keystore", "wb") as stream:
+              stream.write(data)
+          print(f"Restored verified stable signing keystore: {len(data)} bytes")
+          PY
+          keytool -list -keystore webresearch.keystore -storepass webresearch -alias webresearch >/dev/null
+      - name: Build APK
+        env:
+          WEB_RESEARCH_VERSION: v${{ steps.version.outputs.number }}
+        run: gradle :app:assembleDebug
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk web-research-v${{ steps.version.outputs.number }}.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-research-v${{ steps.version.outputs.number }}
+          path: web-research-v${{ steps.version.outputs.number }}.apk
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: web research v${{ steps.version.outputs.number }}
+          files: web-research-v${{ steps.version.outputs.number }}.apk
+          make_latest: true
