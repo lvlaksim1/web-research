@@ -17,6 +17,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
       - name: Remove Postman export only
         shell: bash
         run: |
@@ -27,8 +29,19 @@ jobs:
           s = p.read_text()
           needle = '        actions.addView(detailButton("POSTMAN JSON"){PostmanDelivery.deliver(this,PostmanRequestExporter.build(event,methodOf(event),requestCookies),url)})\n'
           if s.count(needle) != 1:
-              raise SystemExit(f'Expected exactly one POSTMAN JSON UI action, found {s.count(needle)}')
+              raise SystemExit(f'Expected exactly one debugger POSTMAN JSON action, found {s.count(needle)}')
           p.write_text(s.replace(needle, ''))
+
+          p = Path('app/src/main/java/ru/evrasia/research/NetworkResearchActivity.kt')
+          s = p.read_text()
+          block = '''        actions.addView(primaryButton("POSTMAN JSON") {
+            val cookies = if (url.startsWith("http")) CookieManager.getInstance().getCookie(url).orEmpty() else ""
+            copy("POSTMAN JSON", PostmanRequestExporter.build(event, method, cookies))
+        }, LinearLayout.LayoutParams(0, dp(46), 1f))
+'''
+          if s.count(block) != 1:
+              raise SystemExit(f'Expected exactly one research POSTMAN JSON action, found {s.count(block)}')
+          p.write_text(s.replace(block, ''))
           PY
           rm app/src/main/java/ru/evrasia/research/PostmanDelivery.kt
           rm app/src/main/java/ru/evrasia/research/PostmanRequestExporter.kt
@@ -36,12 +49,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RniE 'POSTMAN JSON|PostmanDelivery|PostmanRequestExporter' app/src/main
+          if grep -RniE 'POSTMAN JSON|PostmanDelivery|PostmanRequestExporter' app/src/main; then exit 1; fi
           test -f app/src/main/java/ru/evrasia/research/NetworkReplayController.kt
           grep -q 'EDIT / REPLAY' app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
           grep -q 'NetworkReplayController' app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
       - name: Build APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: gradle :app:assembleDebug
       - name: Finalize as one commit
         shell: bash
         run: |
@@ -49,7 +62,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/remove-postman-json.yml
-          git add app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
+          git add app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt app/src/main/java/ru/evrasia/research/NetworkResearchActivity.kt
           git add -u app/src/main/java/ru/evrasia/research
           git commit --amend --no-edit
           git push --force-with-lease origin HEAD:main
