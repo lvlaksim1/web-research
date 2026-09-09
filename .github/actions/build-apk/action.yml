@@ -1,0 +1,35 @@
+name: L3 Project APK Builder
+description: Build the project-specific unsigned APK candidate
+
+inputs:
+  release_number:
+    description: Numeric APK release version supplied by L2
+    required: true
+
+outputs:
+  apk_path:
+    description: Path to the unsigned APK candidate
+    value: ${{ steps.result.outputs.apk_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up project Gradle
+      uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
+    - name: Build project release APK
+      env:
+        RELEASE_VERSION_CODE: ${{ inputs.release_number }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        ./gradlew :app:assembleRelease
+
+    - name: Return APK candidate
+      id: result
+      shell: bash
+      run: |
+        set -euo pipefail
+        APK_PATH="app/build/outputs/apk/release/app-release-unsigned.apk"
+        test -s "$APK_PATH"
+        echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"

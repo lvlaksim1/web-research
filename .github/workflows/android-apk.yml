@@ -13,18 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare-release:
-    uses: ./.github/workflows/_release-core.yml
-    with:
-      mode: prepare
-
   release-apk:
-    if: ${{ needs.prepare-release.outputs.release_requested == 'true' }}
-    needs: prepare-release
     uses: ./.github/workflows/_release-apk.yml
     with:
       project_name: web research
-      release_number: ${{ needs.prepare-release.outputs.release_number }}
       expected_package_id: web.research
       expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
     secrets:

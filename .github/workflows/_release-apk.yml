@@ -1,4 +1,4 @@
-name: L2 Android APK Release
+name: L2 Universal APK Release
 
 on:
   workflow_call:
@@ -9,14 +9,8 @@ on:
         default: "release"
         type: string
       project_name:
-        description: "Human-readable project name; required for release"
-        required: false
-        default: ""
-        type: string
-      release_number:
-        description: "Numeric release version; required for release"
-        required: false
-        default: ""
+        description: "Human-readable project name"
+        required: true
         type: string
       expected_package_id:
         required: true
@@ -33,7 +27,14 @@ on:
         required: false
 
 jobs:
+  prepare-release:
+    uses: ./.github/workflows/_release-core.yml
+    with:
+      mode: prepare
+
   build-sign-verify:
+    if: ${{ inputs.mode == 'validate' || needs.prepare-release.outputs.release_requested == 'true' }}
+    needs: prepare-release
     runs-on: ubuntu-latest
     timeout-minutes: 35
     outputs:
@@ -44,17 +45,17 @@ jobs:
         id: metadata
         env:
           MODE: ${{ inputs.mode }}
-          PROJECT_NAME: ${{ inputs.project_name }}
-          INPUT_RELEASE_NUMBER: ${{ inputs.release_number }}
+          RELEASE_REQUESTED: ${{ needs.prepare-release.outputs.release_requested }}
+          PREPARED_RELEASE_NUMBER: ${{ needs.prepare-release.outputs.release_number }}
         shell: bash
         run: |
           set -euo pipefail
 
           case "$MODE" in
             release)
-              test -n "$PROJECT_NAME"
-              [[ "$INPUT_RELEASE_NUMBER" =~ ^[0-9]+$ ]]
-              RELEASE_NUMBER="$INPUT_RELEASE_NUMBER"
+              test "$RELEASE_REQUESTED" = "true"
+              [[ "$PREPARED_RELEASE_NUMBER" =~ ^[0-9]+$ ]]
+              RELEASE_NUMBER="$PREPARED_RELEASE_NUMBER"
               ;;
             validate)
               RELEASE_NUMBER=9999
@@ -84,32 +85,31 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
-
-      - name: Install Android build tools
+      - name: Install universal APK tools
         shell: bash
         run: sdkmanager --install "build-tools;35.0.0"
 
-      - name: Build unsigned release APK
-        env:
-          RELEASE_VERSION_CODE: ${{ steps.metadata.outputs.release_number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./gradlew :app:assembleRelease
+      - name: Build project APK candidate
+        id: project-build
+        uses: ./.github/actions/build-apk
+        with:
+          release_number: ${{ steps.metadata.outputs.release_number }}
 
-      - name: Check unsigned APK
+      - name: Check project APK candidate
+        env:
+          CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+          test -n "$CANDIDATE_APK"
+          test -s "$CANDIDATE_APK"
 
       - name: Sign and verify APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
           RELEASE_NUMBER: ${{ steps.metadata.outputs.release_number }}
           RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
+          CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
           EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
           EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
         shell: bash
@@ -140,11 +140,10 @@ jobs:
 
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
-          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
           test -x "$APKSIGNER"
           test -x "$AAPT"
 
-          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$RELEASE_APK_FILENAME" "$UNSIGNED_APK"
+          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$RELEASE_APK_FILENAME" "$CANDIDATE_APK"
           "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK_FILENAME"
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionCode='${RELEASE_NUMBER}'"
