@@ -1,24 +1,27 @@
-name: Print Telegram chat id
+name: Telegram secret check
 
 on:
   push:
     branches: [main]
 
 jobs:
-  print:
+  check:
     runs-on: ubuntu-latest
     steps:
-      - name: Print chat id
+      - name: Send test with configured secrets
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         shell: bash
         run: |
           set -euo pipefail
-          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
-          UPDATES=$(curl --silent --show-error --fail-with-body "$API/getUpdates?timeout=0")
-          CHAT_ID=$(printf '%s' "$UPDATES" | jq -r '[.result[] | select(.message.chat.type == "private") | .message.chat.id] | last // empty')
-          if [ -z "$CHAT_ID" ]; then
-            echo "CHAT_ID_NOT_FOUND"
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram secrets are not configured"
             exit 1
           fi
-          echo "CHAT_ID=$CHAT_ID"
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+          APK_URL="https://github.com/lvlaksim1/web-research/releases/download/v3/web-research-v3.apk"
+          TEXT="web-research v3 — проверка TELEGRAM_CHAT_ID\n\nСкачать APK:\n${APK_URL}"
+          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
+          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
+          echo "TELEGRAM_SECRET_TEST=success"
