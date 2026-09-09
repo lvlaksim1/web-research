@@ -1,0 +1,55 @@
+name: Remove POSTMAN JSON export
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Remove Postman export only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt')
+          s = p.read_text()
+          needle = '        actions.addView(detailButton("POSTMAN JSON"){PostmanDelivery.deliver(this,PostmanRequestExporter.build(event,methodOf(event),requestCookies),url)})\n'
+          if s.count(needle) != 1:
+              raise SystemExit(f'Expected exactly one POSTMAN JSON UI action, found {s.count(needle)}')
+          p.write_text(s.replace(needle, ''))
+          PY
+          rm app/src/main/java/ru/evrasia/research/PostmanDelivery.kt
+          rm app/src/main/java/ru/evrasia/research/PostmanRequestExporter.kt
+      - name: Verify scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE 'POSTMAN JSON|PostmanDelivery|PostmanRequestExporter' app/src/main
+          test -f app/src/main/java/ru/evrasia/research/NetworkReplayController.kt
+          grep -q 'EDIT / REPLAY' app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
+          grep -q 'NetworkReplayController' app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
+      - name: Build APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Finalize as one commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/remove-postman-json.yml
+          git add app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt
+          git add -u app/src/main/java/ru/evrasia/research
+          git commit --amend --no-edit
+          git push --force-with-lease origin HEAD:main
