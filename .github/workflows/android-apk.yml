@@ -3,7 +3,6 @@ name: Build Android APK
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,52 +14,27 @@ concurrency:
 
 jobs:
   prepare-release:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
     uses: ./.github/workflows/_release-core.yml
     with:
       mode: prepare
       project_name: web research
     secrets: inherit
 
-  build-web-research:
-    needs: prepare-release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build unsigned release APK
-        env:
-          WEB_RESEARCH_VERSION: v${{ needs.prepare-release.outputs.release_number }}
-          WEB_RESEARCH_VERSION_CODE: ${{ needs.prepare-release.outputs.release_number }}
-        run: gradle :app:assembleRelease
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-research-unsigned-${{ needs.prepare-release.outputs.release_number }}
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
-          retention-days: 1
-
   release-apk:
-    needs:
-      - prepare-release
-      - build-web-research
+    if: ${{ needs.prepare-release.outputs.release_requested == 'true' }}
+    needs: prepare-release
     uses: ./.github/workflows/_release-apk.yml
     with:
       project_name: web research
       release_number: ${{ needs.prepare-release.outputs.release_number }}
       release_tag: ${{ needs.prepare-release.outputs.release_tag }}
-      unsigned_artifact_name: web-research-unsigned-${{ needs.prepare-release.outputs.release_number }}
-      unsigned_apk_filename: app-release-unsigned.apk
+      source_artifact_name: ${{ needs.prepare-release.outputs.source_artifact_name }}
+      java_version: "17"
+      gradle_version: "8.9"
+      build_command: "gradle :app:assembleRelease"
+      version_name_env: WEB_RESEARCH_VERSION
+      version_code_env: WEB_RESEARCH_VERSION_CODE
+      unsigned_apk_path: app/build/outputs/apk/release/app-release-unsigned.apk
       release_apk_filename: web-research-v${{ needs.prepare-release.outputs.release_number }}.apk
       expected_package_id: web.research
       expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96

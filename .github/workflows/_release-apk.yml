@@ -12,10 +12,29 @@ on:
       release_tag:
         required: true
         type: string
-      unsigned_artifact_name:
+      source_artifact_name:
         required: true
         type: string
-      unsigned_apk_filename:
+      java_version:
+        required: false
+        default: "17"
+        type: string
+      gradle_version:
+        required: false
+        default: "8.9"
+        type: string
+      build_command:
+        required: true
+        type: string
+      version_name_env:
+        required: false
+        default: ""
+        type: string
+      version_code_env:
+        required: false
+        default: ""
+        type: string
+      unsigned_apk_path:
         required: true
         type: string
       release_apk_filename:
@@ -44,15 +63,32 @@ on:
         required: false
 
 jobs:
-  sign-verify:
+  build-sign-verify:
     runs-on: ubuntu-latest
     steps:
+      - name: Download source snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_artifact_name }}
+          path: source-package
+
+      - name: Extract source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s source-package/release-source.tar.gz
+          tar -xzf source-package/release-source.tar.gz -C .
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ inputs.java_version }}
 
       - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ inputs.gradle_version }}
 
       - name: Install Android build tools
         shell: bash
@@ -60,16 +96,36 @@ jobs:
           BUILD_TOOLS: ${{ inputs.android_build_tools }}
         run: sdkmanager --install "build-tools;${BUILD_TOOLS}"
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.unsigned_artifact_name }}
-          path: unsigned
+      - name: Build unsigned release APK
+        env:
+          RELEASE_NUMBER: ${{ inputs.release_number }}
+          VERSION_NAME_ENV: ${{ inputs.version_name_env }}
+          VERSION_CODE_ENV: ${{ inputs.version_code_env }}
+          BUILD_COMMAND: ${{ inputs.build_command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$VERSION_NAME_ENV" ]; then
+            export "${VERSION_NAME_ENV}=v${RELEASE_NUMBER}"
+          fi
+          if [ -n "$VERSION_CODE_ENV" ]; then
+            export "${VERSION_CODE_ENV}=${RELEASE_NUMBER}"
+          fi
+          bash -lc "$BUILD_COMMAND"
+
+      - name: Check unsigned APK
+        env:
+          UNSIGNED_APK_PATH: ${{ inputs.unsigned_apk_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$UNSIGNED_APK_PATH"
 
       - name: Sign and verify APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
           RELEASE_NUMBER: ${{ inputs.release_number }}
-          UNSIGNED_APK_FILENAME: ${{ inputs.unsigned_apk_filename }}
+          UNSIGNED_APK_PATH: ${{ inputs.unsigned_apk_path }}
           RELEASE_APK_FILENAME: ${{ inputs.release_apk_filename }}
           EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
           EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
@@ -84,6 +140,8 @@ jobs:
 
           SIGN_DIR="$RUNNER_TEMP/android-signing"
           SIGN_ZIP="$RUNNER_TEMP/android-signing.zip"
+          trap 'rm -rf "$SIGN_DIR" "$SIGN_ZIP"' EXIT
+
           mkdir -p "$SIGN_DIR"
           printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$SIGN_ZIP"
           unzip -q "$SIGN_ZIP" -d "$SIGN_DIR"
@@ -92,24 +150,21 @@ jobs:
           chmod 600 "$SIGN_DIR/key.pk8"
 
           CERT_SHA256=$(openssl x509 -in "$SIGN_DIR/cert.pem" -outform DER | sha256sum | awk '{print $1}')
-          test "$CERT_SHA256" = "$EXPECTED_CERT_SHA256"
-
-          UNSIGNED_APK="unsigned/${UNSIGNED_APK_FILENAME}"
-          SIGNED_APK="${RELEASE_APK_FILENAME}"
-          test -s "$UNSIGNED_APK"
+          if [ "$CERT_SHA256" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "Unexpected Android signing certificate"
+            exit 1
+          fi
 
           APKSIGNER="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner"
           AAPT="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/aapt"
           test -x "$APKSIGNER"
           test -x "$AAPT"
 
-          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$SIGNED_APK" "$UNSIGNED_APK"
-          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
-          "$AAPT" dump badging "$SIGNED_APK" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
-          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionCode='${RELEASE_NUMBER}'"
-          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionName='v${RELEASE_NUMBER}'"
-
-          rm -rf "$SIGN_DIR" "$SIGN_ZIP"
+          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$RELEASE_APK_FILENAME" "$UNSIGNED_APK_PATH"
+          "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK_FILENAME"
+          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
+          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionCode='${RELEASE_NUMBER}'"
+          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionName='v${RELEASE_NUMBER}'"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -119,7 +174,7 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: sign-verify
+    needs: build-sign-verify
     uses: ./.github/workflows/_release-core.yml
     with:
       mode: publish
@@ -128,5 +183,29 @@ jobs:
       release_tag: ${{ inputs.release_tag }}
       artifact_upload_name: release-artifact
       artifact_filename: ${{ inputs.release_apk_filename }}
-      telegram_enabled: ${{ inputs.telegram_enabled }}
     secrets: inherit
+
+  telegram:
+    if: ${{ inputs.telegram_enabled }}
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send APK link to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_APK_FILENAME: ${{ inputs.release_apk_filename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram secrets are not configured"
+            exit 1
+          fi
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${RELEASE_APK_FILENAME}"
+          printf -v TEXT '%s %s собран успешно.\n\nСкачать APK:\n%s' "$PROJECT_NAME" "$RELEASE_TAG" "$APK_URL"
+          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
+          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null

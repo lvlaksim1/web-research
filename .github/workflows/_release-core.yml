@@ -31,37 +31,52 @@ on:
         required: false
         default: ""
         type: string
-      telegram_enabled:
-        description: "Send release link to Telegram"
-        required: false
-        default: true
-        type: boolean
     outputs:
+      release_requested:
+        description: "true when the push commit requests a release"
+        value: ${{ jobs.prepare.outputs.requested }}
       release_number:
         description: "Next numeric release version"
         value: ${{ jobs.prepare.outputs.number }}
       release_tag:
         description: "Next release tag"
         value: ${{ jobs.prepare.outputs.tag }}
-    secrets:
-      TELEGRAM_BOT_TOKEN:
-        required: false
-      TELEGRAM_CHAT_ID:
-        required: false
+      source_artifact_name:
+        description: "Artifact containing the checked-out source snapshot"
+        value: ${{ jobs.prepare.outputs.source_artifact }}
 
 jobs:
   prepare:
     if: ${{ inputs.mode == 'prepare' }}
     runs-on: ubuntu-latest
     outputs:
+      requested: ${{ steps.gate.outputs.requested }}
       number: ${{ steps.version.outputs.number }}
       tag: ${{ steps.version.outputs.tag }}
+      source_artifact: ${{ steps.source.outputs.artifact_name }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check release request
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ] && printf '%s' "$COMMIT_MESSAGE" | grep -Fq '[release]'; then
+            echo "requested=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "requested=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.requested == 'true' }}
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Determine next release version
+        if: ${{ steps.gate.outputs.requested == 'true' }}
         id: version
         shell: bash
         run: |
@@ -72,6 +87,25 @@ jobs:
           NEXT=$((LAST + 1))
           echo "number=$NEXT" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare source snapshot
+        if: ${{ steps.gate.outputs.requested == 'true' }}
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --output="$RUNNER_TEMP/release-source.tar.gz" HEAD
+          test -s "$RUNNER_TEMP/release-source.tar.gz"
+          echo "artifact_name=release-source" >> "$GITHUB_OUTPUT"
+
+      - name: Upload source snapshot
+        if: ${{ steps.gate.outputs.requested == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/release-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
 
   publish:
     if: ${{ inputs.mode == 'publish' }}
@@ -134,27 +168,6 @@ jobs:
             Commit: `${{ github.sha }}`
             Artifact: `${{ inputs.artifact_filename }}`
             SHA-256: `${{ steps.hash.outputs.sha256 }}`
-
-      - name: Send release link to Telegram
-        if: ${{ inputs.telegram_enabled }}
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          PROJECT_NAME: ${{ inputs.project_name }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          ARTIFACT_FILENAME: ${{ inputs.artifact_filename }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
-            echo "Telegram secrets are not configured"
-            exit 1
-          fi
-          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
-          ARTIFACT_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${ARTIFACT_FILENAME}"
-          printf -v TEXT '%s %s собран успешно.\n\nСкачать:\n%s' "$PROJECT_NAME" "$RELEASE_TAG" "$ARTIFACT_URL"
-          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
-          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
 
       - name: Delete completed Actions artifacts
         env:
