@@ -1,108 +1,69 @@
 name: Build Android APK
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: write
   actions: write
+
+concurrency:
+  group: web-research-release
+  cancel-in-progress: false
+
 jobs:
-  build:
+  prepare-release:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
+    uses: ./.github/workflows/_release-core.yml
+    with:
+      mode: prepare
+      project_name: web research
+    secrets: inherit
+
+  build-web-research:
+    needs: prepare-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Determine next release version
-        id: version
-        shell: bash
-        run: |
-          git fetch --tags --force
-          LAST=$(git tag -l 'v[0-9]*' | sed 's/^v//' | grep -E '^[0-9]+$' | sort -n | tail -1)
-          if [ -z "$LAST" ]; then LAST=0; fi
-          NEXT=$((LAST + 1))
-          echo "number=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+
       - name: Build unsigned release APK
         env:
-          WEB_RESEARCH_VERSION: v${{ steps.version.outputs.number }}
-          WEB_RESEARCH_VERSION_CODE: ${{ steps.version.outputs.number }}
+          WEB_RESEARCH_VERSION: v${{ needs.prepare-release.outputs.release_number }}
+          WEB_RESEARCH_VERSION_CODE: ${{ needs.prepare-release.outputs.release_number }}
         run: gradle :app:assembleRelease
-      - name: Sign and verify APK
-        env:
-          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-          RELEASE_NUMBER: ${{ steps.version.outputs.number }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${ANDROID_KEYSTORE:-}" ]; then
-            echo "ANDROID_KEYSTORE is not configured"
-            exit 1
-          fi
-          SIGN_DIR="$RUNNER_TEMP/web-research-signing"
-          SIGN_ZIP="$RUNNER_TEMP/web-research-signing.zip"
-          mkdir -p "$SIGN_DIR"
-          printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$SIGN_ZIP"
-          unzip -q "$SIGN_ZIP" -d "$SIGN_DIR"
-          test -s "$SIGN_DIR/key.pk8"
-          test -s "$SIGN_DIR/cert.pem"
-          chmod 600 "$SIGN_DIR/key.pk8"
-          EXPECTED_CERT_SHA256="336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96"
-          CERT_SHA256=$(openssl x509 -in "$SIGN_DIR/cert.pem" -outform DER | sha256sum | awk '{print $1}')
-          if [ "$CERT_SHA256" != "$EXPECTED_CERT_SHA256" ]; then
-            echo "Unexpected Android signing certificate"
-            exit 1
-          fi
-          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-          SIGNED_APK="web-research-v${RELEASE_NUMBER}.apk"
-          test -s "$UNSIGNED_APK"
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
-          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
-          test -x "$APKSIGNER"
-          test -x "$AAPT"
-          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$SIGNED_APK" "$UNSIGNED_APK"
-          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
-          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionCode='${RELEASE_NUMBER}'"
-          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionName='v${RELEASE_NUMBER}'"
-          rm -rf "$SIGN_DIR" "$SIGN_ZIP"
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: web research v${{ steps.version.outputs.number }}
-          files: web-research-v${{ steps.version.outputs.number }}.apk
-          make_latest: true
-      - name: Send APK link to Telegram
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
-            echo "Telegram secrets are not configured"
-            exit 1
-          fi
-          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
-          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/web-research-${RELEASE_TAG}.apk"
-          printf -v TEXT 'web-research %s собран успешно.\n\nСкачать APK:\n%s' "$RELEASE_TAG" "$APK_URL"
-          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
-          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
-          echo "Telegram notification sent"
-      - name: Delete completed Actions artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r ARTIFACT_ID; do
-            [ -z "$ARTIFACT_ID" ] && continue
-            gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
-          done
+          name: web-research-unsigned-${{ needs.prepare-release.outputs.release_number }}
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  release-apk:
+    needs:
+      - prepare-release
+      - build-web-research
+    uses: ./.github/workflows/_release-apk.yml
+    with:
+      project_name: web research
+      release_number: ${{ needs.prepare-release.outputs.release_number }}
+      release_tag: ${{ needs.prepare-release.outputs.release_tag }}
+      unsigned_artifact_name: web-research-unsigned-${{ needs.prepare-release.outputs.release_number }}
+      unsigned_apk_filename: app-release-unsigned.apk
+      release_apk_filename: web-research-v${{ needs.prepare-release.outputs.release_number }}.apk
+      expected_package_id: web.research
+      expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
+      android_build_tools: "35.0.0"
+      telegram_enabled: true
+    secrets: inherit

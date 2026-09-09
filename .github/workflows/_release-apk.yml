@@ -1,0 +1,132 @@
+name: L2 Android APK Release
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        required: true
+        type: string
+      release_number:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+      unsigned_artifact_name:
+        required: true
+        type: string
+      unsigned_apk_filename:
+        required: true
+        type: string
+      release_apk_filename:
+        required: true
+        type: string
+      expected_package_id:
+        required: true
+        type: string
+      expected_cert_sha256:
+        required: true
+        type: string
+      android_build_tools:
+        required: false
+        default: "35.0.0"
+        type: string
+      telegram_enabled:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      ANDROID_KEYSTORE:
+        required: true
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_CHAT_ID:
+        required: false
+
+jobs:
+  sign-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        shell: bash
+        env:
+          BUILD_TOOLS: ${{ inputs.android_build_tools }}
+        run: sdkmanager --install "build-tools;${BUILD_TOOLS}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.unsigned_artifact_name }}
+          path: unsigned
+
+      - name: Sign and verify APK
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          RELEASE_NUMBER: ${{ inputs.release_number }}
+          UNSIGNED_APK_FILENAME: ${{ inputs.unsigned_apk_filename }}
+          RELEASE_APK_FILENAME: ${{ inputs.release_apk_filename }}
+          EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
+          EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
+          BUILD_TOOLS: ${{ inputs.android_build_tools }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE:-}" ]; then
+            echo "ANDROID_KEYSTORE is not configured"
+            exit 1
+          fi
+
+          SIGN_DIR="$RUNNER_TEMP/android-signing"
+          SIGN_ZIP="$RUNNER_TEMP/android-signing.zip"
+          mkdir -p "$SIGN_DIR"
+          printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$SIGN_ZIP"
+          unzip -q "$SIGN_ZIP" -d "$SIGN_DIR"
+          test -s "$SIGN_DIR/key.pk8"
+          test -s "$SIGN_DIR/cert.pem"
+          chmod 600 "$SIGN_DIR/key.pk8"
+
+          CERT_SHA256=$(openssl x509 -in "$SIGN_DIR/cert.pem" -outform DER | sha256sum | awk '{print $1}')
+          test "$CERT_SHA256" = "$EXPECTED_CERT_SHA256"
+
+          UNSIGNED_APK="unsigned/${UNSIGNED_APK_FILENAME}"
+          SIGNED_APK="${RELEASE_APK_FILENAME}"
+          test -s "$UNSIGNED_APK"
+
+          APKSIGNER="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/aapt"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+
+          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$SIGNED_APK" "$UNSIGNED_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
+          "$AAPT" dump badging "$SIGNED_APK" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
+          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionCode='${RELEASE_NUMBER}'"
+          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionName='v${RELEASE_NUMBER}'"
+
+          rm -rf "$SIGN_DIR" "$SIGN_ZIP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifact
+          path: ${{ inputs.release_apk_filename }}
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: sign-verify
+    uses: ./.github/workflows/_release-core.yml
+    with:
+      mode: publish
+      project_name: ${{ inputs.project_name }}
+      release_number: ${{ inputs.release_number }}
+      release_tag: ${{ inputs.release_tag }}
+      artifact_upload_name: release-artifact
+      artifact_filename: ${{ inputs.release_apk_filename }}
+      telegram_enabled: ${{ inputs.telegram_enabled }}
+    secrets: inherit

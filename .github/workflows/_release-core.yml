@@ -1,0 +1,168 @@
+name: L1 Universal Release Core
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: "prepare or publish"
+        required: true
+        type: string
+      project_name:
+        description: "Human-readable project name"
+        required: true
+        type: string
+      artifact_upload_name:
+        description: "Actions artifact that contains the final release file"
+        required: false
+        default: "release-artifact"
+        type: string
+      artifact_filename:
+        description: "Final release file name"
+        required: false
+        default: ""
+        type: string
+      release_number:
+        description: "Numeric release version"
+        required: false
+        default: ""
+        type: string
+      release_tag:
+        description: "Release tag, for example v42"
+        required: false
+        default: ""
+        type: string
+      telegram_enabled:
+        description: "Send release link to Telegram"
+        required: false
+        default: true
+        type: boolean
+    outputs:
+      release_number:
+        description: "Next numeric release version"
+        value: ${{ jobs.prepare.outputs.number }}
+      release_tag:
+        description: "Next release tag"
+        value: ${{ jobs.prepare.outputs.tag }}
+    secrets:
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_CHAT_ID:
+        required: false
+
+jobs:
+  prepare:
+    if: ${{ inputs.mode == 'prepare' }}
+    runs-on: ubuntu-latest
+    outputs:
+      number: ${{ steps.version.outputs.number }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          LAST=$(git tag -l 'v[0-9]*' | sed 's/^v//' | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -z "$LAST" ]; then LAST=0; fi
+          NEXT=$((LAST + 1))
+          echo "number=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+
+  publish:
+    if: ${{ inputs.mode == 'publish' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release inputs
+        shell: bash
+        env:
+          RELEASE_NUMBER: ${{ inputs.release_number }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARTIFACT_FILENAME: ${{ inputs.artifact_filename }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_NUMBER"
+          test "$RELEASE_TAG" = "v${RELEASE_NUMBER}"
+          test -n "$ARTIFACT_FILENAME"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_upload_name }}
+          path: release-artifact
+
+      - name: Validate artifact and calculate SHA-256
+        id: hash
+        shell: bash
+        env:
+          ARTIFACT_FILENAME: ${{ inputs.artifact_filename }}
+        run: |
+          set -euo pipefail
+          FILE="release-artifact/${ARTIFACT_FILENAME}"
+          test -s "$FILE"
+          SHA256=$(sha256sum "$FILE" | awk '{print $1}')
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          printf '%s  %s\n' "$SHA256" "$ARTIFACT_FILENAME" > "${FILE}.sha256"
+
+      - name: Ensure release tag is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists"
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: ${{ inputs.project_name }} ${{ inputs.release_tag }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            release-artifact/${{ inputs.artifact_filename }}
+            release-artifact/${{ inputs.artifact_filename }}.sha256
+          make_latest: true
+          generate_release_notes: true
+          body: |
+            Commit: `${{ github.sha }}`
+            Artifact: `${{ inputs.artifact_filename }}`
+            SHA-256: `${{ steps.hash.outputs.sha256 }}`
+
+      - name: Send release link to Telegram
+        if: ${{ inputs.telegram_enabled }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          ARTIFACT_FILENAME: ${{ inputs.artifact_filename }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Telegram secrets are not configured"
+            exit 1
+          fi
+          API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}"
+          ARTIFACT_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${ARTIFACT_FILENAME}"
+          printf -v TEXT '%s %s собран успешно.\n\nСкачать:\n%s' "$PROJECT_NAME" "$RELEASE_TAG" "$ARTIFACT_URL"
+          RESPONSE=$(curl --silent --show-error --fail-with-body -X POST "$API/sendMessage" --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" --data-urlencode "text=${TEXT}")
+          printf '%s' "$RESPONSE" | jq -e '.ok == true' >/dev/null
+
+      - name: Delete completed Actions artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r ARTIFACT_ID; do
+            [ -z "$ARTIFACT_ID" ] && continue
+            gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+          done
