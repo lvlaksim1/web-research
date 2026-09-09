@@ -3,14 +3,20 @@ name: L2 Android APK Release
 on:
   workflow_call:
     inputs:
+      mode:
+        description: "release or validate"
+        required: false
+        default: "release"
+        type: string
       project_name:
-        required: true
+        description: "Human-readable project name; required for release"
+        required: false
+        default: ""
         type: string
       release_number:
-        required: true
-        type: string
-      release_apk_filename:
-        required: true
+        description: "Numeric release version; required for release"
+        required: false
+        default: ""
         type: string
       expected_package_id:
         required: true
@@ -18,14 +24,6 @@ on:
       expected_cert_sha256:
         required: true
         type: string
-      android_build_tools:
-        required: false
-        default: "35.0.0"
-        type: string
-      telegram_enabled:
-        required: false
-        default: true
-        type: boolean
     secrets:
       ANDROID_KEYSTORE:
         required: true
@@ -37,38 +35,64 @@ on:
 jobs:
   build-sign-verify:
     runs-on: ubuntu-latest
+    outputs:
+      effective_release_number: ${{ steps.metadata.outputs.release_number }}
+      apk_filename: ${{ steps.metadata.outputs.apk_filename }}
     steps:
-      - name: Download source snapshot
-        uses: actions/download-artifact@v4
-        with:
-          name: release-source
-          path: source-package
-
-      - name: Extract source snapshot
+      - name: Define APK metadata
+        id: metadata
+        env:
+          MODE: ${{ inputs.mode }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+          INPUT_RELEASE_NUMBER: ${{ inputs.release_number }}
         shell: bash
         run: |
           set -euo pipefail
-          test -s source-package/release-source.tar.gz
-          tar -xzf source-package/release-source.tar.gz -C .
 
-      - uses: actions/setup-java@v5
+          case "$MODE" in
+            release)
+              test -n "$PROJECT_NAME"
+              [[ "$INPUT_RELEASE_NUMBER" =~ ^[0-9]+$ ]]
+              RELEASE_NUMBER="$INPUT_RELEASE_NUMBER"
+              ;;
+            validate)
+              RELEASE_NUMBER=9999
+              ;;
+            *)
+              echo "Unsupported APK workflow mode: $MODE"
+              exit 1
+              ;;
+          esac
+
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          echo "release_number=$RELEASE_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "apk_filename=${REPO_NAME}-v${RELEASE_NUMBER}.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: Install Android build tools
         shell: bash
-        env:
-          BUILD_TOOLS: ${{ inputs.android_build_tools }}
-        run: sdkmanager --install "build-tools;${BUILD_TOOLS}"
+        run: sdkmanager --install "build-tools;35.0.0"
 
       - name: Build unsigned release APK
         env:
-          RELEASE_VERSION_CODE: ${{ inputs.release_number }}
+          RELEASE_VERSION_CODE: ${{ steps.metadata.outputs.release_number }}
         shell: bash
         run: |
           set -euo pipefail
@@ -83,14 +107,14 @@ jobs:
       - name: Sign and verify APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-          RELEASE_NUMBER: ${{ inputs.release_number }}
-          RELEASE_APK_FILENAME: ${{ inputs.release_apk_filename }}
+          RELEASE_NUMBER: ${{ steps.metadata.outputs.release_number }}
+          RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
           EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
           EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
-          BUILD_TOOLS: ${{ inputs.android_build_tools }}
         shell: bash
         run: |
           set -euo pipefail
+
           if [ -z "${ANDROID_KEYSTORE:-}" ]; then
             echo "ANDROID_KEYSTORE is not configured"
             exit 1
@@ -113,8 +137,8 @@ jobs:
             exit 1
           fi
 
-          APKSIGNER="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/apksigner"
-          AAPT="$ANDROID_HOME/build-tools/${BUILD_TOOLS}/aapt"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
           test -x "$APKSIGNER"
           test -x "$AAPT"
@@ -125,25 +149,39 @@ jobs:
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionCode='${RELEASE_NUMBER}'"
           "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionName='v${RELEASE_NUMBER}'"
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload release APK artifact
+        if: ${{ inputs.mode == 'release' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-artifact
-          path: ${{ inputs.release_apk_filename }}
+          path: ${{ steps.metadata.outputs.apk_filename }}
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload validation APK artifact
+        if: ${{ inputs.mode == 'validate' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: work-branch-signed-apk
+          path: ${{ steps.metadata.outputs.apk_filename }}
           if-no-files-found: error
           retention-days: 1
 
   publish:
+    if: ${{ inputs.mode == 'release' }}
     needs: build-sign-verify
     uses: ./.github/workflows/_release-core.yml
     with:
       mode: publish
       project_name: ${{ inputs.project_name }}
-      release_number: ${{ inputs.release_number }}
-      artifact_filename: ${{ inputs.release_apk_filename }}
+      release_number: ${{ needs.build-sign-verify.outputs.effective_release_number }}
+      artifact_filename: ${{ needs.build-sign-verify.outputs.apk_filename }}
 
   telegram:
-    if: ${{ inputs.telegram_enabled }}
-    needs: publish
+    if: ${{ inputs.mode == 'release' }}
+    needs:
+      - build-sign-verify
+      - publish
     runs-on: ubuntu-latest
     steps:
       - name: Send APK link to Telegram
@@ -151,11 +189,12 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PROJECT_NAME: ${{ inputs.project_name }}
-          RELEASE_NUMBER: ${{ inputs.release_number }}
-          RELEASE_APK_FILENAME: ${{ inputs.release_apk_filename }}
+          RELEASE_NUMBER: ${{ needs.build-sign-verify.outputs.effective_release_number }}
+          RELEASE_APK_FILENAME: ${{ needs.build-sign-verify.outputs.apk_filename }}
         shell: bash
         run: |
           set -u
+
           if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
             echo "::warning::GitHub Release published, but Telegram secrets are not configured"
             exit 0
