@@ -19,10 +19,6 @@ on:
         required: false
         default: "17"
         type: string
-      gradle_version:
-        required: false
-        default: "8.9"
-        type: string
       build_command:
         required: true
         type: string
@@ -87,8 +83,6 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: ${{ inputs.gradle_version }}
 
       - name: Install Android build tools
         shell: bash

@@ -15,13 +15,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
       - name: Build unsigned release APK
         env:
           WEB_RESEARCH_VERSION: v9999
           WEB_RESEARCH_VERSION_CODE: 9999
-        run: gradle :app:assembleRelease
+        run: ./gradlew :app:assembleRelease
       - name: Sign and verify test APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
