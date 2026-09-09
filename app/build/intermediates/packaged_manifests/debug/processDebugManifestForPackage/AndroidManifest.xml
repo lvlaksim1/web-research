@@ -37,11 +37,6 @@
             android:exported="false"
             android:initOrder="90" />
         <provider
-            android:name="ru.evrasia.research.AuthUiProvider"
-            android:authorities="web.research.authUi"
-            android:exported="false"
-            android:initOrder="80" />
-        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="web.research.files"
             android:exported="false"

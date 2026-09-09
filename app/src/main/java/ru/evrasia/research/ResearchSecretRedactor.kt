@@ -7,7 +7,7 @@ import java.util.Locale
 
 /**
  * Produces a share-safe copy of research records while keeping the live debugger
- * copy untouched so AUTH dependency reconstruction can still use exact values.
+ * copy untouched so the raw capture can retain exact values when required.
  */
 internal object ResearchSecretRedactor {
     private const val REDACTED = "[redacted]"
@@ -18,7 +18,6 @@ internal object ResearchSecretRedactor {
         redactHeaders(out.optJSONObject("requestHeaders"))
         redactHeaders(out.optJSONObject("responseHeaders"))
         redactNamedArray(out.optJSONArray("formFields"))
-        redactNamedArray(out.optJSONArray("_authFormFields"))
         listOf("requestBody", "responseBody", "data").forEach { key ->
             if (!out.has(key)) return@forEach
             val raw = out.optString(key, "")

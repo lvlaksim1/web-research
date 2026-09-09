@@ -85,17 +85,6 @@ internal object NetworkEventClassifier {
 
     fun isRealtimeSession(event: JSONObject): Boolean = event.optBoolean("_realtimeSession", false)
 
-    fun isApiRelevant(event: JSONObject): Boolean {
-        if (isActionEvent(event) || isRealtimeSession(event)) return true
-        val sources = eventSources(event)
-        if (event.optString("source", "") == "replay") return true
-        if (sources.any { it in setOf("fetch", "fetch-meta", "xhr", "xhr-meta", "websocket-open", "websocket-send", "websocket-receive", "sse-open", "sse-message", "beacon") }) return true
-        val method = methodOf(event)
-        if (method in setOf("POST", "PUT", "PATCH", "DELETE", "WS", "SSE")) return true
-        if (hasRequestBody(event) || responseKind(event) == "JSON") return true
-        val url = event.optString("url", "").lowercase(Locale.US)
-        return url.contains("/api/") || url.contains("/graphql") || url.contains("/ajax") || url.contains("/rest/")
-    }
 
     fun isPlainRequestEvent(event: JSONObject): Boolean = event.optString("source") in setOf(
         "fetch", "fetch-meta", "xhr", "xhr-meta", "webview", "resource-copy", "resource-timing", "navigation", "navigation-timing", "new-window",

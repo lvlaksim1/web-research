@@ -287,7 +287,6 @@ class NetworkResearchActivity : AppCompatActivity() {
         val options = arrayOf(
             if (NetworkDebugStore.recording) "Остановить запись" else "Начать запись",
             "Очистить сетевой журнал",
-            "Экспорт ZIP",
             "Расширенный журнал"
         )
         val dialog = AlertDialog.Builder(this)
@@ -299,8 +298,7 @@ class NetworkResearchActivity : AppCompatActivity() {
                         NetworkDebugStore.clear()
                         refreshData(force = true)
                     }
-                    2 -> beginExport()
-                    3 -> startActivity(Intent(this, NetworkDebuggerActivity::class.java))
+                    2 -> startActivity(Intent(this, NetworkDebuggerActivity::class.java))
                 }
             }
             .create()
@@ -448,14 +446,6 @@ class NetworkResearchActivity : AppCompatActivity() {
         if (headers == null || headers.length() == 0) return "—"
         val keys = headers.keys().asSequence().toList().sorted()
         return keys.joinToString("\n") { key -> "$key: ${headers.optString(key, "")}" }
-    }
-
-    private fun beginExport() {
-        NetworkRequestActions.prepareFullExport(this)
-        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-        ResultDelivery.deliverGeneratedFile(this, "Экспорт ZIP", "web-research-$stamp.zip", "application/zip") { output ->
-            if (!NetworkRequestActions.writeFullExport(this, output)) throw IllegalStateException("export failed")
-        }
     }
 
     @Deprecated("Deprecated in Java")

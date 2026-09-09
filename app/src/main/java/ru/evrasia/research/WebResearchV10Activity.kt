@@ -154,6 +154,25 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
         toolbar.addView(pageAction, LinearLayout.LayoutParams(dp(42), dp(46)).apply { marginStart = dp(5) })
 
+        val zipButton = Button(this).apply {
+            tag = "browser-zip"
+            text = "ZIP"
+            contentDescription = "Экспорт ZIP"
+            isAllCaps = false
+            textSize = 9.5f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(palette.accent)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(4), 0, dp(4), 0)
+            background = rounded(palette.card, 13f, palette.divider)
+            setOnClickListener { exportZip() }
+        }
+        toolbar.addView(zipButton, LinearLayout.LayoutParams(dp(54), dp(46)).apply { marginStart = dp(4) })
+
         val networkContainer = FrameLayout(this).apply {
             tag = "browser-network"
             clipChildren = true
@@ -333,12 +352,6 @@ class WebResearchV10Activity : AppCompatActivity() {
             addMenuRow("⌫", "Удалить cookies домена", if (cookieCount > 0) "$cookieCount cookies" else "Нет cookies") {
                 dialog.dismiss()
                 confirmClearCookies(cookieCount)
-            }
-
-            addSection("ИССЛЕДОВАНИЕ")
-            addMenuRow("⇩", "Экспорт ZIP", "Полный архив исследования") {
-                dialog.dismiss()
-                showExportSheet()
             }
 
             addSection("ИНТЕРФЕЙС")
@@ -522,29 +535,6 @@ class WebResearchV10Activity : AppCompatActivity() {
             addDangerButton("Удалить") {
                 dialog.dismiss()
                 webViewController.clearCurrentDomainCookies()
-            }
-        }
-    }
-
-    private fun showExportSheet() {
-        showBottomSheet("Экспорт исследования") { dialog ->
-            addView(TextView(this@WebResearchV10Activity).apply {
-                text = "В архив войдут HAR, события, JavaScript, ресурсы, snapshots, cookies и metadata."
-                setTextColor(palette.secondary)
-                textSize = 13f
-                setPadding(dp(14), dp(4), dp(14), dp(14))
-            })
-            listOf("HAR", "События", "JavaScript", "Ресурсы", "Snapshots", "Cookies", "Metadata").forEach { item ->
-                addView(TextView(this@WebResearchV10Activity).apply {
-                    text = "✓  $item"
-                    setTextColor(palette.text)
-                    textSize = 14f
-                    setPadding(dp(14), dp(7), dp(14), dp(7))
-                })
-            }
-            addPrimaryButton("Создать ZIP") {
-                dialog.dismiss()
-                exportZip()
             }
         }
     }

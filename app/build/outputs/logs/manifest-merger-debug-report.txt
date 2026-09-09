@@ -21,33 +21,22 @@ INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidMa
 		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:19:13-35
 	android:name
 		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:16:13-50
-provider#ru.evrasia.research.AuthUiProvider
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:20:9-24:38
+provider#androidx.core.content.FileProvider
+INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:20:9-28:20
+	android:grantUriPermissions
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:24:13-47
 	android:authorities
 		INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:22:13-58
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:22:13-57
 	android:exported
 		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:23:13-37
-	android:initOrder
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:24:13-35
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:21:13-43
-provider#androidx.core.content.FileProvider
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:25:9-33:20
-	android:grantUriPermissions
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:29:13-47
-	android:authorities
-		INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:27:13-57
-	android:exported
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:28:13-37
-	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:26:13-62
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:21:13-62
 manifest
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-43:12
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-43:12
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-43:12
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-43:12
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-38:12
+INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-38:12
+INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-38:12
+INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:1:1-38:12
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] /home/runner/.gradle/caches/8.9/transforms/e9a7a4a42f17411a1dd7d1be9c014d85/transformed/appcompat-resources-1.7.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.appcompat:appcompat:1.7.0] /home/runner/.gradle/caches/8.9/transforms/b6c5e032a003934e4adfaba9fa53f2ca/transformed/appcompat-1.7.0/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.swiperefreshlayout:swiperefreshlayout:1.1.0] /home/runner/.gradle/caches/8.9/transforms/50f08dad09f92be0441391e79072b0fc/transformed/swiperefreshlayout-1.1.0/AndroidManifest.xml:17:1-24:12
@@ -91,8 +80,8 @@ ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManif
 	android:name
 		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:2:22-64
 application
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:3:5-42:19
-INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:3:5-42:19
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:3:5-37:19
+INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:3:5-37:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/8.9/transforms/268b965e38ac6c3d7965eb62437bdecd/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] /home/runner/.gradle/caches/8.9/transforms/268b965e38ac6c3d7965eb62437bdecd/transformed/emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.core:core:1.15.0] /home/runner/.gradle/caches/8.9/transforms/3e85dc3a27e7bbf172ac49206d18ddee/transformed/core-1.15.0/AndroidManifest.xml:28:5-89
@@ -122,43 +111,43 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/runne
 	android:name
 		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:4:9-39
 activity#ru.evrasia.research.WebResearchV10Activity
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:34:9-39:20
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:29:9-34:20
 	android:exported
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:34:58-81
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:29:58-81
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:34:19-57
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:29:19-57
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:35:13-38:29
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:30:13-33:29
 action#android.intent.action.MAIN
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:17-69
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:31:17-69
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:25-66
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:31:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:37:17-77
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:32:17-77
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:37:27-74
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:32:27-74
 activity#ru.evrasia.research.NetworkResearchActivity
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:40:9-118
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:35:9-118
 	android:label
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:40:84-115
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:35:84-115
 	android:exported
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:40:59-83
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:35:59-83
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:40:19-58
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:35:19-58
 activity#ru.evrasia.research.NetworkDebuggerActivity
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:41:9-118
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:9-118
 	android:label
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:41:84-115
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:84-115
 	android:exported
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:41:59-83
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:59-83
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:41:19-58
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:36:19-58
 meta-data#android.support.FILE_PROVIDER_PATHS
-ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:30:13-32:54
+ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:25:13-27:54
 	android:resource
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:32:17-51
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:27:17-51
 	android:name
-		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:31:17-67
+		ADDED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml:26:17-67
 uses-sdk
 INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/runner/work/web-research/web-research/app/src/main/AndroidManifest.xml

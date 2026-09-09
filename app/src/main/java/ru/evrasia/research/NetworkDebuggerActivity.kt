@@ -316,10 +316,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
                 applyFilters()
             }
         })
-        content.addView(popupRow("Экспорт ZIP", false) {
-            popup?.dismiss()
-            exportZip()
-        })
         popup = buildPopup(content, 275)
         showAboveRight(popup, content, anchor, 275)
     }
