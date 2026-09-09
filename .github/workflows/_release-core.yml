@@ -33,8 +33,10 @@ on:
 jobs:
   prepare:
     if: ${{ inputs.mode == 'prepare' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
       requested: ${{ steps.gate.outputs.requested }}
       number: ${{ steps.version.outputs.number }}
@@ -53,28 +55,32 @@ jobs:
             echo "requested=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout repository
-        if: ${{ steps.gate.outputs.requested == 'true' }}
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-
       - name: Determine next release version
         if: ${{ steps.gate.outputs.requested == 'true' }}
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --tags --force
-          LAST=$(git tag -l 'v[0-9]*' | sed 's/^v//' | grep -E '^[0-9]+$' | sort -n | tail -1)
-          if [ -z "$LAST" ]; then LAST=0; fi
+
+          TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/tags?per_page=100" --jq '.[].name')
+          LAST=$(printf '%s\n' "$TAGS" | sed -nE 's/^v([0-9]+)$/\1/p' | sort -n | tail -1)
+
+          if [ -z "$LAST" ]; then
+            LAST=0
+          fi
+
           NEXT=$((LAST + 1))
           echo "number=$NEXT" >> "$GITHUB_OUTPUT"
 
   publish:
     if: ${{ inputs.mode == 'publish' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
     steps:
       - name: Validate release inputs
         env:
@@ -121,25 +127,70 @@ jobs:
           FILE="release-artifact/${ARTIFACT_FILENAME}"
           VERIFY_DIR="$RUNNER_TEMP/release-verify"
 
+          read_tag_sha() {
+            gh api "/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true
+          }
+
+          delete_matching_tag() {
+            TAG_SHA=$(read_tag_sha)
+            if [ -z "$TAG_SHA" ]; then
+              return 0
+            fi
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "Tag $RELEASE_TAG points to unexpected commit $TAG_SHA"
+              return 1
+            fi
+            gh api --method DELETE "/repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" >/dev/null
+          }
+
           verify_published_release() {
+            RELEASE_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")
+            IS_DRAFT=$(printf '%s' "$RELEASE_JSON" | jq -r '.draft')
+            TARGET_COMMIT=$(printf '%s' "$RELEASE_JSON" | jq -r '.target_commitish')
+            test "$IS_DRAFT" = "false"
+            test "$TARGET_COMMIT" = "$GITHUB_SHA"
+
             rm -rf "$VERIFY_DIR"
             mkdir -p "$VERIFY_DIR"
             gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ARTIFACT_FILENAME" --dir "$VERIFY_DIR"
             test -s "$VERIFY_DIR/$ARTIFACT_FILENAME"
             REMOTE_SHA256=$(sha256sum "$VERIFY_DIR/$ARTIFACT_FILENAME" | awk '{print $1}')
             test "$REMOTE_SHA256" = "$EXPECTED_SHA256"
-            IS_DRAFT=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')
-            test "$IS_DRAFT" = "false"
           }
 
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; verifying it for idempotent recovery"
-            verify_published_release
-            echo "Existing release matches the expected artifact"
-            exit 0
+          EXISTING_RELEASE=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>/dev/null || true)
+          if [ -n "$EXISTING_RELEASE" ]; then
+            EXISTING_DRAFT=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.draft')
+            EXISTING_TARGET=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.target_commitish')
+            EXISTING_ID=$(printf '%s' "$EXISTING_RELEASE" | jq -r '.id // empty')
+
+            if [ "$EXISTING_TARGET" != "$GITHUB_SHA" ]; then
+              echo "Release $RELEASE_TAG points to unexpected target $EXISTING_TARGET"
+              exit 1
+            fi
+
+            if [ "$EXISTING_DRAFT" = "false" ]; then
+              echo "Release $RELEASE_TAG already exists; verifying it for idempotent recovery"
+              verify_published_release
+              echo "Existing release matches the expected commit and artifact"
+              exit 0
+            fi
+
+            echo "Recovering stale draft Release $RELEASE_TAG"
+            test -n "$EXISTING_ID"
+
+            TAG_SHA=$(read_tag_sha)
+            if [ -n "$TAG_SHA" ] && [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "Draft release tag $RELEASE_TAG points to unexpected commit $TAG_SHA"
+              exit 1
+            fi
+
+            gh api --method DELETE "/repos/$GITHUB_REPOSITORY/releases/$EXISTING_ID" >/dev/null
+            delete_matching_tag
           fi
 
-          if gh api "/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+          TAG_SHA=$(read_tag_sha)
+          if [ -n "$TAG_SHA" ]; then
             echo "Tag $RELEASE_TAG already exists without a matching release"
             exit 1
           fi
@@ -154,17 +205,17 @@ jobs:
           rollback_draft() {
             if [ "$PUBLISHED" != "true" ]; then
               gh api --method DELETE "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" >/dev/null 2>&1 || true
-              gh api --method DELETE "/repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" >/dev/null 2>&1 || true
+              delete_matching_tag >/dev/null 2>&1 || true
             fi
           }
           trap rollback_draft EXIT
 
-          APK_ASSET_NAME=$(jq -rn --arg value "$ARTIFACT_FILENAME" '$value|@uri')
-          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/octet-stream" --data-binary "@$FILE" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$APK_ASSET_NAME" >/dev/null
+          ASSET_NAME=$(jq -rn --arg value "$ARTIFACT_FILENAME" '$value|@uri')
+          curl --silent --show-error --fail-with-body -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -H "Content-Type: application/octet-stream" --data-binary "@$FILE" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$ASSET_NAME" >/dev/null
 
           ASSETS=$(gh api "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100")
-          APK_OK=$(printf '%s' "$ASSETS" | jq --arg name "$ARTIFACT_FILENAME" '[.[] | select(.name == $name and .size > 0)] | length')
-          test "$APK_OK" = "1"
+          ASSET_OK=$(printf '%s' "$ASSETS" | jq --arg name "$ARTIFACT_FILENAME" '[.[] | select(.name == $name and .size > 0)] | length')
+          test "$ASSET_OK" = "1"
 
           gh api --method PATCH "/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true >/dev/null
           PUBLISHED=true

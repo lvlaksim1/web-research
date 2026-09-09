@@ -9,8 +9,8 @@ permissions:
   actions: write
 
 concurrency:
-  group: web-research-release
-  cancel-in-progress: false
+  group: apk-release
+  queue: max
 
 jobs:
   release-apk:

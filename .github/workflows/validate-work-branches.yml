@@ -13,7 +13,6 @@ jobs:
     uses: ./.github/workflows/_release-apk.yml
     with:
       mode: validate
-      project_name: web research
       expected_package_id: web.research
       expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
     secrets:

@@ -9,8 +9,9 @@ on:
         default: "release"
         type: string
       project_name:
-        description: "Human-readable project name"
-        required: true
+        description: "Human-readable project name; required for release"
+        required: false
+        default: ""
         type: string
       expected_package_id:
         required: true
@@ -28,6 +29,8 @@ on:
 
 jobs:
   prepare-release:
+    permissions:
+      contents: read
     uses: $/.github/workflows/_release-core.yml
     with:
       mode: prepare
@@ -35,8 +38,10 @@ jobs:
   build-sign-verify:
     if: ${{ inputs.mode == 'validate' || needs.prepare-release.outputs.release_requested == 'true' }}
     needs: prepare-release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
+    permissions:
+      contents: read
     outputs:
       effective_release_number: ${{ steps.metadata.outputs.release_number }}
       apk_filename: ${{ steps.metadata.outputs.apk_filename }}
@@ -91,26 +96,67 @@ jobs:
 
       - name: Build project APK candidate
         id: project-build
-        uses: $/.github/actions/build-apk
+        uses: ./.github/actions/build-apk
         with:
           release_number: ${{ steps.metadata.outputs.release_number }}
 
-      - name: Check project APK candidate
+      - name: Validate unsigned APK candidate
+        env:
+          CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
+          RELEASE_NUMBER: ${{ steps.metadata.outputs.release_number }}
+          EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$CANDIDATE_APK"
+          test -s "$CANDIDATE_APK"
+
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+
+          BADGING=$("$AAPT" dump badging "$CANDIDATE_APK")
+          printf '%s\n' "$BADGING" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
+          printf '%s\n' "$BADGING" | grep -F "versionCode='${RELEASE_NUMBER}'"
+          printf '%s\n' "$BADGING" | grep -F "versionName='v${RELEASE_NUMBER}'"
+
+          if "$APKSIGNER" verify "$CANDIDATE_APK" >/dev/null 2>&1; then
+            echo "L3 build adapter returned an already-signed APK; unsigned candidate required"
+            exit 1
+          fi
+
+      - name: Verify APK native architecture
         env:
           CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$CANDIDATE_APK"
-          test -s "$CANDIDATE_APK"
+          mapfile -t ABIS < <(unzip -Z1 "$CANDIDATE_APK" | awk -F/ '$1 == "lib" && NF >= 3 {print $2}' | sort -u)
+
+          if [ "${#ABIS[@]}" -eq 0 ]; then
+            echo "APK contains no native libraries; architecture-independent APK accepted"
+            exit 0
+          fi
+
+          printf 'Native ABIs: %s\n' "${ABIS[*]}"
+
+          if ! printf '%s\n' "${ABIS[@]}" | grep -Fxq 'arm64-v8a'; then
+            echo "APK does not contain required arm64-v8a native libraries"
+            exit 1
+          fi
+
+          if printf '%s\n' "${ABIS[@]}" | grep -Fvxq 'arm64-v8a'; then
+            echo "APK contains native ABI other than arm64-v8a"
+            exit 1
+          fi
 
       - name: Sign and verify APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-          RELEASE_NUMBER: ${{ steps.metadata.outputs.release_number }}
           RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
           CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
-          EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
           EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
         shell: bash
         run: |
@@ -139,40 +185,10 @@ jobs:
           fi
 
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
-          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
           test -x "$APKSIGNER"
-          test -x "$AAPT"
 
           "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$RELEASE_APK_FILENAME" "$CANDIDATE_APK"
           "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK_FILENAME"
-          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "package: name='${EXPECTED_PACKAGE_ID}'"
-          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionCode='${RELEASE_NUMBER}'"
-          "$AAPT" dump badging "$RELEASE_APK_FILENAME" | grep -F "versionName='v${RELEASE_NUMBER}'"
-
-      - name: Verify APK native architecture
-        env:
-          RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t ABIS < <(unzip -Z1 "$RELEASE_APK_FILENAME" | awk -F/ '$1 == "lib" && NF >= 3 {print $2}' | sort -u)
-
-          if [ "${#ABIS[@]}" -eq 0 ]; then
-            echo "APK contains no native libraries; architecture-independent APK accepted"
-            exit 0
-          fi
-
-          printf 'Native ABIs: %s\n' "${ABIS[*]}"
-
-          if ! printf '%s\n' "${ABIS[@]}" | grep -Fxq 'arm64-v8a'; then
-            echo "APK does not contain required arm64-v8a native libraries"
-            exit 1
-          fi
-
-          if printf '%s\n' "${ABIS[@]}" | grep -Fvxq 'arm64-v8a'; then
-            echo "APK contains native ABI other than arm64-v8a"
-            exit 1
-          fi
 
       - name: Upload release APK artifact
         if: ${{ inputs.mode == 'release' }}
@@ -195,6 +211,9 @@ jobs:
   publish:
     if: ${{ inputs.mode == 'release' }}
     needs: build-sign-verify
+    permissions:
+      contents: write
+      actions: write
     uses: $/.github/workflows/_release-core.yml
     with:
       mode: publish
@@ -207,10 +226,12 @@ jobs:
     needs:
       - build-sign-verify
       - publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - name: Keep APKs only for current and previous releases
+      - name: Keep only current and previous APK binaries
         env:
           GH_TOKEN: ${{ github.token }}
           CURRENT_NUMBER: ${{ needs.build-sign-verify.outputs.effective_release_number }}
@@ -219,38 +240,40 @@ jobs:
           set +e
           CURRENT_TAG="v${CURRENT_NUMBER}"
 
-          RELEASE_TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          ASSET_ROWS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | .tag_name as $tag | select($tag | test("^v[0-9]+$")) | .assets[]? | select((.name | endswith(".apk")) or (.name | endswith(".apk.sha256"))) | [$tag, (.id | tostring), .name] | @tsv')
           if [ $? -ne 0 ]; then
-            echo "::warning::Could not list releases for APK retention cleanup"
+            echo "::warning::Could not list release assets for APK retention cleanup"
             exit 0
           fi
 
-          TAGS=$(printf '%s\n' "$RELEASE_TAGS" | grep -E '^v[0-9]+$' || true)
-          PREVIOUS_NUMBER=$(printf '%s\n' "$TAGS" | sed 's/^v//' | awk -v current="$CURRENT_NUMBER" '$1 < current' | sort -n | tail -1)
+          PREVIOUS_NUMBER=$(printf '%s\n' "$ASSET_ROWS" | awk -F '\t' -v current="$CURRENT_NUMBER" '$3 ~ /\.apk$/ {n=substr($1,2)+0; if (n < current+0) print n}' | sort -n | tail -1)
           PREVIOUS_TAG=""
           if [ -n "$PREVIOUS_NUMBER" ]; then
             PREVIOUS_TAG="v${PREVIOUS_NUMBER}"
           fi
 
           CLEANUP_FAILED=false
-          while read -r TAG; do
-            [ -z "$TAG" ] && continue
-            [ "$TAG" = "$CURRENT_TAG" ] && continue
-            [ -n "$PREVIOUS_TAG" ] && [ "$TAG" = "$PREVIOUS_TAG" ] && continue
+          while IFS=$'\t' read -r TAG ASSET_ID ASSET_NAME; do
+            [ -z "$ASSET_ID" ] && continue
 
-            ASSET_IDS=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[]? | select(.name | endswith(".apk")) | .id')
-            if [ $? -ne 0 ]; then
-              CLEANUP_FAILED=true
-              continue
-            fi
+            DELETE_ASSET=false
+            case "$ASSET_NAME" in
+              *.apk.sha256)
+                DELETE_ASSET=true
+                ;;
+              *.apk)
+                if [ "$TAG" != "$CURRENT_TAG" ] && { [ -z "$PREVIOUS_TAG" ] || [ "$TAG" != "$PREVIOUS_TAG" ]; }; then
+                  DELETE_ASSET=true
+                fi
+                ;;
+            esac
 
-            while read -r ASSET_ID; do
-              [ -z "$ASSET_ID" ] && continue
+            if [ "$DELETE_ASSET" = "true" ]; then
               if ! gh api --method DELETE "/repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" >/dev/null; then
                 CLEANUP_FAILED=true
               fi
-            done <<< "$ASSET_IDS"
-          done <<< "$TAGS"
+            fi
+          done <<< "$ASSET_ROWS"
 
           if [ "$CLEANUP_FAILED" = "true" ]; then
             echo "::warning::Release succeeded, but some old APK assets could not be deleted"
@@ -262,8 +285,9 @@ jobs:
     needs:
       - build-sign-verify
       - publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions: {}
     steps:
       - name: Send APK link to Telegram
         env:
