@@ -29,12 +29,48 @@ jobs:
           NEXT=$((LAST + 1))
           echo "number=$NEXT" >> "$GITHUB_OUTPUT"
           echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
-      - name: Build APK
+      - name: Build unsigned release APK
         env:
           WEB_RESEARCH_VERSION: v${{ steps.version.outputs.number }}
-        run: gradle :app:assembleDebug
-      - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk web-research-v${{ steps.version.outputs.number }}.apk
+          WEB_RESEARCH_VERSION_CODE: ${{ steps.version.outputs.number }}
+        run: gradle :app:assembleRelease
+      - name: Sign and verify APK
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          RELEASE_NUMBER: ${{ steps.version.outputs.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE:-}" ]; then
+            echo "ANDROID_KEYSTORE is not configured"
+            exit 1
+          fi
+          SIGN_DIR="$RUNNER_TEMP/web-research-signing"
+          SIGN_ZIP="$RUNNER_TEMP/web-research-signing.zip"
+          mkdir -p "$SIGN_DIR"
+          printf '%s' "$ANDROID_KEYSTORE" | base64 --decode > "$SIGN_ZIP"
+          unzip -q "$SIGN_ZIP" -d "$SIGN_DIR"
+          test -s "$SIGN_DIR/key.pk8"
+          test -s "$SIGN_DIR/cert.pem"
+          chmod 600 "$SIGN_DIR/key.pk8"
+          EXPECTED_CERT_SHA256="336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96"
+          CERT_SHA256=$(openssl x509 -in "$SIGN_DIR/cert.pem" -outform DER | sha256sum | awk '{print $1}')
+          if [ "$CERT_SHA256" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "Unexpected Android signing certificate"
+            exit 1
+          fi
+          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+          SIGNED_APK="web-research-v${RELEASE_NUMBER}.apk"
+          test -s "$UNSIGNED_APK"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$SIGNED_APK" "$UNSIGNED_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK"
+          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionCode='${RELEASE_NUMBER}'"
+          "$AAPT" dump badging "$SIGNED_APK" | grep -F "versionName='v${RELEASE_NUMBER}'"
+          rm -rf "$SIGN_DIR" "$SIGN_ZIP"
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
