@@ -26,11 +26,6 @@ on:
         required: false
         default: ""
         type: string
-      release_tag:
-        description: "Release tag, for example v42"
-        required: false
-        default: ""
-        type: string
     outputs:
       release_requested:
         description: "true when the push commit requests a release"
@@ -38,12 +33,6 @@ on:
       release_number:
         description: "Next numeric release version"
         value: ${{ jobs.prepare.outputs.number }}
-      release_tag:
-        description: "Next release tag"
-        value: ${{ jobs.prepare.outputs.tag }}
-      source_artifact_name:
-        description: "Artifact containing the checked-out source snapshot"
-        value: ${{ jobs.prepare.outputs.source_artifact }}
 
 jobs:
   prepare:
@@ -52,8 +41,6 @@ jobs:
     outputs:
       requested: ${{ steps.gate.outputs.requested }}
       number: ${{ steps.version.outputs.number }}
-      tag: ${{ steps.version.outputs.tag }}
-      source_artifact: ${{ steps.source.outputs.artifact_name }}
     steps:
       - name: Check release request
         id: gate
@@ -86,17 +73,14 @@ jobs:
           if [ -z "$LAST" ]; then LAST=0; fi
           NEXT=$((LAST + 1))
           echo "number=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
 
       - name: Prepare source snapshot
         if: ${{ steps.gate.outputs.requested == 'true' }}
-        id: source
         shell: bash
         run: |
           set -euo pipefail
           git archive --format=tar.gz --output="$RUNNER_TEMP/release-source.tar.gz" HEAD
           test -s "$RUNNER_TEMP/release-source.tar.gz"
-          echo "artifact_name=release-source" >> "$GITHUB_OUTPUT"
 
       - name: Upload source snapshot
         if: ${{ steps.gate.outputs.requested == 'true' }}
@@ -115,12 +99,10 @@ jobs:
         shell: bash
         env:
           RELEASE_NUMBER: ${{ inputs.release_number }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
           ARTIFACT_FILENAME: ${{ inputs.artifact_filename }}
         run: |
           set -euo pipefail
-          test -n "$RELEASE_NUMBER"
-          test "$RELEASE_TAG" = "v${RELEASE_NUMBER}"
+          [[ "$RELEASE_NUMBER" =~ ^[0-9]+$ ]]
           test -n "$ARTIFACT_FILENAME"
 
       - uses: actions/download-artifact@v4
@@ -144,7 +126,7 @@ jobs:
       - name: Ensure release tag is new
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: v${{ inputs.release_number }}
         shell: bash
         run: |
           set -euo pipefail
@@ -156,8 +138,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag }}
-          name: ${{ inputs.project_name }} ${{ inputs.release_tag }}
+          tag_name: v${{ inputs.release_number }}
+          name: ${{ inputs.project_name }} v${{ inputs.release_number }}
           target_commitish: ${{ github.sha }}
           files: |
             release-artifact/${{ inputs.artifact_filename }}
@@ -169,13 +151,13 @@ jobs:
             Artifact: `${{ inputs.artifact_filename }}`
             SHA-256: `${{ steps.hash.outputs.sha256 }}`
 
-      - name: Delete completed Actions artifacts
+      - name: Delete current run Actions artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r ARTIFACT_ID; do
+          gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r ARTIFACT_ID; do
             [ -z "$ARTIFACT_ID" ] && continue
             gh api --method DELETE "/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
           done

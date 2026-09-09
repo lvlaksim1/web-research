@@ -7,7 +7,7 @@ android {
         applicationId = "web.research"
         minSdk = 26
         targetSdk = 35
-        val appVersionCode = (System.getenv("WEB_RESEARCH_VERSION_CODE") ?: "1").toInt()
+        val appVersionCode = (System.getenv("RELEASE_VERSION_CODE") ?: "1").toInt()
         versionCode = appVersionCode
         versionName = "v$appVersionCode"
     }

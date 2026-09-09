@@ -18,7 +18,6 @@ jobs:
     with:
       mode: prepare
       project_name: web research
-    secrets: inherit
 
   release-apk:
     if: ${{ needs.prepare-release.outputs.release_requested == 'true' }}
@@ -27,13 +26,10 @@ jobs:
     with:
       project_name: web research
       release_number: ${{ needs.prepare-release.outputs.release_number }}
-      release_tag: ${{ needs.prepare-release.outputs.release_tag }}
-      source_artifact_name: ${{ needs.prepare-release.outputs.source_artifact_name }}
-      version_code_env: WEB_RESEARCH_VERSION_CODE
-      unsigned_apk_path: app/build/outputs/apk/release/app-release-unsigned.apk
       release_apk_filename: web-research-v${{ needs.prepare-release.outputs.release_number }}.apk
       expected_package_id: web.research
       expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
-      android_build_tools: "35.0.0"
-      telegram_enabled: true
-    secrets: inherit
+    secrets:
+      ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
