@@ -15,13 +15,6 @@ on:
       source_artifact_name:
         required: true
         type: string
-      java_version:
-        required: false
-        default: "17"
-        type: string
-      build_command:
-        required: true
-        type: string
       version_code_env:
         required: false
         default: ""
@@ -74,7 +67,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ inputs.java_version }}
+          java-version: "17"
 
       - uses: android-actions/setup-android@v3
 
@@ -90,14 +83,13 @@ jobs:
         env:
           RELEASE_NUMBER: ${{ inputs.release_number }}
           VERSION_CODE_ENV: ${{ inputs.version_code_env }}
-          BUILD_COMMAND: ${{ inputs.build_command }}
         shell: bash
         run: |
           set -euo pipefail
           if [ -n "$VERSION_CODE_ENV" ]; then
             export "${VERSION_CODE_ENV}=${RELEASE_NUMBER}"
           fi
-          bash -lc "$BUILD_COMMAND"
+          ./gradlew :app:assembleRelease
 
       - name: Check unsigned APK
         env:

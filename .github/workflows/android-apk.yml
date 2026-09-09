@@ -29,8 +29,6 @@ jobs:
       release_number: ${{ needs.prepare-release.outputs.release_number }}
       release_tag: ${{ needs.prepare-release.outputs.release_tag }}
       source_artifact_name: ${{ needs.prepare-release.outputs.source_artifact_name }}
-      java_version: "17"
-      build_command: "./gradlew :app:assembleRelease"
       version_code_env: WEB_RESEARCH_VERSION_CODE
       unsigned_apk_path: app/build/outputs/apk/release/app-release-unsigned.apk
       release_apk_filename: web-research-v${{ needs.prepare-release.outputs.release_number }}.apk
