@@ -1,6 +1,5 @@
 package ru.evrasia.research
 
-import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -35,9 +34,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class NetworkDebuggerActivity : AppCompatActivity() {
     private val bg get() = WebUiTheme.palette(this).background
@@ -68,13 +64,13 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     private val domains = mutableListOf<String>()
     private val changedIds = hashSetOf<Long>()
     private val handler = Handler(Looper.getMainLooper())
-    private val listTimeFormat = SimpleDateFormat("HH:mm:ss.SSS",Locale.US)
 
     private var lastRevision = -1L
     private var mergeMode = false
     private val typeFilters = listOf("ALL","JSON","HTML","JS","CSS","IMG","PDF","TEXT","BIN","OTHER")
     private val methodFilters = listOf("ALL","GET","POST","PUT","PATCH","DELETE","OPTIONS","HEAD","WS","SSE","OTHER")
     private val detailsController by lazy { NetworkDebuggerDetailsController(this, changedIds) }
+    private val realtimeController by lazy { NetworkDebuggerRealtimeController(this) }
 
     private val refresh = object : Runnable {
         override fun run() {
@@ -142,7 +138,7 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             val event = items[position]
             when {
                 isActionEvent(event) -> Unit
-                isRealtimeSession(event) -> showRealtimeSession(event)
+                isRealtimeSession(event) -> realtimeController.show(event)
                 else -> detailsController.show(event, search.text.toString().trim())
             }
         }
@@ -486,52 +482,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private fun hostOf(url:String):String? = NetworkEventClassifier.hostOf(url)
 
-    private fun showRealtimeSession(session:JSONObject){
-        val arr=session.optJSONArray("_sessionEvents")?:return
-        val dialog=Dialog(this)
-        dialog.setCancelable(true)
-        dialog.setCanceledOnTouchOutside(false)
-        val root=toolDialogRoot(dialog,"Realtime session · ${arr.length()} событий")
-        val body=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        body.addView(TextView(this).apply{text="${session.optString("_realtimeProtocol")}  ${session.optString("url")}";setTextColor(cyan);textSize=11f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);setTextIsSelectable(true);setPadding(dp(8),dp(6),dp(8),dp(6))})
-        val copyText=StringBuilder()
-        for(i in 0 until arr.length()){
-            val e=arr.optJSONObject(i)?:continue
-            val source=e.optString("source","")
-            val direction=when{source.endsWith("-send")->"SEND";source.endsWith("-receive")||source.endsWith("-message")->"RECEIVE";source.endsWith("-open")->"OPEN";else->source.uppercase(Locale.US)}
-            val data=e.optString("data",e.optString("message",e.optString("state","")))
-            val displayLine="${if(e.has("time"))listTime(e.optLong("time")) else "--:--:--.---"}  $direction${if(data.isNotBlank())"\n$data" else ""}"
-            copyText.append(displayLine).append("\n\n")
-            body.addView(TextView(this).apply{text=displayLine;setTextColor(if(direction=="SEND")amber else if(direction=="RECEIVE")accent else muted);textSize=10.5f;typeface=Typeface.MONOSPACE;setTextIsSelectable(true);setPadding(dp(9),dp(8),dp(9),dp(8));background=rounded(panel2,9f,line)},LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,dp(3),0,dp(3))})
-        }
-        root.addView(ScrollView(this).apply{addView(body)},LinearLayout.LayoutParams(-1,0,1f))
-        root.addView(compactButton("REALTIME"){copyText("REALTIME",copyText.toString().trim())},LinearLayout.LayoutParams(-1,dp(42)).apply{setMargins(0,dp(5),0,0)})
-        showToolDialog(dialog,root,.96f,.88f)
-    }
-
-    private fun toolDialogRoot(dialog:Dialog,title:String)=LinearLayout(this).apply{
-        orientation=LinearLayout.VERTICAL;setPadding(dp(8),dp(8),dp(8),dp(8));background=rounded(bg,18f,line)
-        addView(LinearLayout(this@NetworkDebuggerActivity).apply{
-            orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;background=rounded(panel,12f,line);setPadding(dp(5),dp(4),dp(8),dp(4))
-            addView(chromeButton("×","Закрыть"){dialog.dismiss()},LinearLayout.LayoutParams(dp(40),dp(40)))
-            addView(TextView(this@NetworkDebuggerActivity).apply{text=title;setTextColor(textColor);textSize=13f;typeface=Typeface.DEFAULT_BOLD;gravity=Gravity.CENTER_VERTICAL;setPadding(dp(9),0,0,0);maxLines=2},LinearLayout.LayoutParams(0,dp(40),1f))
-        },LinearLayout.LayoutParams(-1,dp(48)).apply{bottomMargin=dp(6)})
-    }
-
-    private fun showToolDialog(dialog:Dialog,root:View,widthFraction:Float,heightFraction:Float){
-        dialog.setContentView(root)
-        dialog.setOnShowListener{
-            val dm=resources.displayMetrics
-            dialog.window?.apply{setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT));setLayout((dm.widthPixels*widthFraction).toInt(),(dm.heightPixels*heightFraction).toInt());setGravity(Gravity.CENTER)}
-        }
-        dialog.show()
-    }
-
-    private fun copyText(label:String,value:String){
-        ResultDelivery.deliverText(this,label,value)
-    }
-
-    private fun listTime(ms:Long)=listTimeFormat.format(Date(ms))
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
         super.onActivityResult(requestCode,resultCode,data)
@@ -540,7 +490,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
     private fun rounded(fill:Int,radius:Float,stroke:Int=Color.TRANSPARENT)=GradientDrawable().apply{shape=GradientDrawable.RECTANGLE;setColor(fill);cornerRadius=dp(radius.toInt()).toFloat();if(stroke!=Color.TRANSPARENT)setStroke(dp(1),stroke)}
-    private fun compactButton(label:String,click:()->Unit)=Button(this).apply{text=label;setTextColor(textColor);textSize=10f;isAllCaps=false;minWidth=0;minimumWidth=0;minHeight=0;minimumHeight=0;setPadding(dp(10),0,dp(10),0);background=rounded(panel2,10f,line);setOnClickListener{click()}}
 
 
 }
