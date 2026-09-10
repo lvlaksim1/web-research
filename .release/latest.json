@@ -1,22 +1,28 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 14,
-  "tag": "v14",
-  "versionCode": 14,
-  "versionName": "v14",
+  "releaseNumber": 15,
+  "tag": "v15",
+  "versionCode": 15,
+  "versionName": "v15",
   "packageId": "web.research",
-  "commit": "9f1c626114450c00669dbe0b90fa65812d5343eb",
-  "artifact": "web-research-v14.apk",
-  "sha256": "330fe5fbd9d4c2036da752f18bf7828b542abb6aa7f0245f0f16e578378f585f",
-  "publishedAt": "2026-09-10T01:07:37Z",
-  "previousRelease": "v13",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v14",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v14/web-research-v14.apk",
+  "commit": "5a552759abe27730dbca0a185d9834cf93943f33",
+  "artifact": "web-research-v15.apk",
+  "sha256": "c23ac04647c6c90130b3ff205cf4682fd8bb9aaf835f15fbcc0f54e5e7af5893",
+  "publishedAt": "2026-09-10T01:35:51Z",
+  "previousRelease": "v14",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v15",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v15/web-research-v15.apk",
   "commits": [
-    "ci: recover standardized release documentation for v13",
-    "docs: verify standardized release documentation automation [release]"
+    "refactor: remove unreachable legacy code",
+    "release: publish dead-code cleanup [release]"
   ],
   "changedFiles": [
-    ".github/workflows/android-apk.yml"
+    "app/src/main/AndroidManifest.xml",
+    "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt",
+    "app/src/main/java/ru/evrasia/research/NetworkRequestActions.kt",
+    "app/src/main/java/ru/evrasia/research/NetworkResearchActivity.kt",
+    "app/src/main/java/ru/evrasia/research/ResearchSecretRedactor.kt",
+    "app/src/main/java/ru/evrasia/research/WebCookieStatsController.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt"
   ]
 }

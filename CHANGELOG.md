@@ -3,6 +3,29 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v15-START -->
+## v15 — 2026-09-10T01:35:51Z
+
+- Release commit: `5a552759abe27730dbca0a185d9834cf93943f33`
+- Artifact: `web-research-v15.apk`
+- SHA-256: `c23ac04647c6c90130b3ff205cf4682fd8bb9aaf835f15fbcc0f54e5e7af5893`
+- Previous release: **v14**
+
+### Changes
+
+- refactor: remove unreachable legacy code
+- release: publish dead-code cleanup [release]
+
+### Changed files
+
+- `app/src/main/AndroidManifest.xml`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkRequestActions.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkResearchActivity.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchSecretRedactor.kt`
+- `app/src/main/java/ru/evrasia/research/WebCookieStatsController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
+<!-- AUTO-CHANGELOG-v15-END -->
 <!-- AUTO-CHANGELOG-v14-START -->
 ## v14 — 2026-09-10T01:07:37Z
 
