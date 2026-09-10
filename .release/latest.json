@@ -1,25 +1,23 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 22,
-  "tag": "v22",
-  "versionCode": 22,
-  "versionName": "v22",
+  "releaseNumber": 23,
+  "tag": "v23",
+  "versionCode": 23,
+  "versionName": "v23",
   "packageId": "web.research",
-  "commit": "a192f87b2da8aa54405a1ce74c81ca2121733d49",
-  "artifact": "web-research-v22.apk",
-  "sha256": "b0055b4e48190e2b0b6c6f485696980098f72a16343721670f645c6deaf58c16",
-  "publishedAt": "2026-09-10T03:23:36Z",
-  "previousRelease": "v21",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v22",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v22/web-research-v22.apk",
+  "commit": "0f04f60df8f82c707bfb70ab2dae1d7d428908af",
+  "artifact": "web-research-v23.apk",
+  "sha256": "9c5120ac33b35bb761758a5e83740d291bfd5e2cd847ef2e0c153ef7a2ff6755",
+  "publishedAt": "2026-09-10T09:40:33Z",
+  "previousRelease": "v22",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v23",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v23/web-research-v23.apk",
   "commits": [
-    "refactor: centralize cookie trace details dialog",
-    "refactor: keep cookie list section labels",
-    "release: publish cookie details refactor [release]"
+    "refactor: extract cookie trace engine",
+    "release: publish cookie trace engine refactor [release]"
   ],
   "changedFiles": [
-    "app/src/main/java/ru/evrasia/research/CookieTraceDetailsDialog.kt",
-    "app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt",
-    "app/src/main/java/ru/evrasia/research/CookieTraceUiProvider.kt"
+    "app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt",
+    "app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt"
   ]
 }

@@ -3,6 +3,24 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v23-START -->
+## v23 — 2026-09-10T09:40:33Z
+
+- Release commit: `0f04f60df8f82c707bfb70ab2dae1d7d428908af`
+- Artifact: `web-research-v23.apk`
+- SHA-256: `9c5120ac33b35bb761758a5e83740d291bfd5e2cd847ef2e0c153ef7a2ff6755`
+- Previous release: **v22**
+
+### Changes
+
+- refactor: extract cookie trace engine
+- release: publish cookie trace engine refactor [release]
+
+### Changed files
+
+- `app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt`
+- `app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt`
+<!-- AUTO-CHANGELOG-v23-END -->
 <!-- AUTO-CHANGELOG-v22-START -->
 ## v22 — 2026-09-10T03:23:36Z
 
