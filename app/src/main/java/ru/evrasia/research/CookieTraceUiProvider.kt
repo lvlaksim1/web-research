@@ -271,6 +271,15 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         }
     }
 
+    private fun sectionText(activity: Activity, value: String): TextView = TextView(activity).apply {
+        text = value
+        setTextColor(cyan)
+        textSize = 9f
+        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        letterSpacing = .08f
+        setPadding(dp(activity, 4), dp(activity, 10), dp(activity, 4), dp(activity, 5))
+    }
+
     private fun showCookieDetails(
         activity: NetworkDebuggerActivity,
         domain: String,
