@@ -3,24 +3,24 @@
 Документ описывает текущее архитектурное состояние `web-research` и ключевые инварианты, которые должны сохраняться при дальнейшем рефакторинге.
 
 <!-- AUTO-RELEASE-START -->
-## Состояние на v11
+## Состояние на v12
 
-- Релизный commit: `b43bc7abb7866725ef0e1f1f6b97a5100614610b`
-- Предыдущая контрольная точка: **v10**
-- APK: `web-research-v11.apk`
-- SHA-256: `3039bfc2a6d3ccd34efd7f41139647c78a21f5eb883c6de9410595960e625d9a`
+- Релизный commit: `05fb86c6dca3abe1d895cf9c53da11bc7c1aa4af`
+- Предыдущая контрольная точка: **v11**
+- APK: `web-research-v12.apk`
+- SHA-256: `f755ab9c749525951635744d8a8a10ed260f83baf89297a076c34a39ac327ffb`
 
-### Изменения между v10 и v11
+### Изменения между v11 и v12
 
-- ci: harden universal APK release standard
-- ci: enforce release permissions at workflow boundaries
-- ci: allow reusable release permission ceiling in validation
-- ci: accept hardened APK release standard [release]
-- ci: fix missing release detection
-- ci: accept hardened APK release standard [release]
+- docs: automate release documentation updates
+- ci: refresh and maintain release workflow dependencies
+- ci: accept maintained release workflow dependencies [release]
 
 ### Затронутые файлы
 
+- `.github/actions/build-apk/action.yml`
+- `.github/dependabot.yml`
+- `.github/scripts/update-release-docs.py`
 - `.github/workflows/_release-apk.yml`
 - `.github/workflows/_release-core.yml`
 - `.github/workflows/android-apk.yml`

@@ -5,29 +5,29 @@ Android WebView-инструмент для максимально полног�
 <!-- AUTO-RELEASE-START -->
 ## Текущий релиз
 
-- Версия: **v11**
-- `versionCode`: **11**
-- `versionName`: **v11**
+- Версия: **v12**
+- `versionCode`: **12**
+- `versionName`: **v12**
 - package: `web.research`
-- commit: `b43bc7abb7866725ef0e1f1f6b97a5100614610b`
-- APK: `web-research-v11.apk`
-- SHA-256: `3039bfc2a6d3ccd34efd7f41139647c78a21f5eb883c6de9410595960e625d9a`
-- Опубликован: `2026-09-09T23:55:57Z`
-- Предыдущий релиз: **v10**
-- Release: https://github.com/lvlaksim1/web-research/releases/tag/v11
-- APK: https://github.com/lvlaksim1/web-research/releases/download/v11/web-research-v11.apk
+- commit: `05fb86c6dca3abe1d895cf9c53da11bc7c1aa4af`
+- APK: `web-research-v12.apk`
+- SHA-256: `f755ab9c749525951635744d8a8a10ed260f83baf89297a076c34a39ac327ffb`
+- Опубликован: `2026-09-10T00:39:13Z`
+- Предыдущий релиз: **v11**
+- Release: https://github.com/lvlaksim1/web-research/releases/tag/v12
+- APK: https://github.com/lvlaksim1/web-research/releases/download/v12/web-research-v12.apk
 
-### Изменения относительно v10
+### Изменения относительно v11
 
-- ci: harden universal APK release standard
-- ci: enforce release permissions at workflow boundaries
-- ci: allow reusable release permission ceiling in validation
-- ci: accept hardened APK release standard [release]
-- ci: fix missing release detection
-- ci: accept hardened APK release standard [release]
+- docs: automate release documentation updates
+- ci: refresh and maintain release workflow dependencies
+- ci: accept maintained release workflow dependencies [release]
 
 ### Изменённые файлы
 
+- `.github/actions/build-apk/action.yml`
+- `.github/dependabot.yml`
+- `.github/scripts/update-release-docs.py`
 - `.github/workflows/_release-apk.yml`
 - `.github/workflows/_release-core.yml`
 - `.github/workflows/android-apk.yml`
