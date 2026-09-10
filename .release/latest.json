@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 20,
-  "tag": "v20",
-  "versionCode": 20,
-  "versionName": "v20",
+  "releaseNumber": 21,
+  "tag": "v21",
+  "versionCode": 21,
+  "versionName": "v21",
   "packageId": "web.research",
-  "commit": "217bd4a82c3b037ac7e4b3b63d34927e6776d4bb",
-  "artifact": "web-research-v20.apk",
-  "sha256": "702351872d53663fbbc047bc3b0b14e582813c8992f8039a7af36dcce1248c4b",
-  "publishedAt": "2026-09-10T03:06:56Z",
-  "previousRelease": "v19",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v20",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v20/web-research-v20.apk",
+  "commit": "5747160d1cc65ef3724b059d0bc9be96fbafacf3",
+  "artifact": "web-research-v21.apk",
+  "sha256": "582f86fd78febe7a6541bee18e78427189ec223f4e7e1943ccba3026b247b773",
+  "publishedAt": "2026-09-10T03:15:00Z",
+  "previousRelease": "v20",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v21",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v21/web-research-v21.apk",
   "commits": [
-    "refactor: extract debugger controls and filters",
-    "release: publish debugger controls refactor [release]"
+    "refactor: extract debugger detail view helpers",
+    "release: publish debugger detail view refactor [release]"
   ],
   "changedFiles": [
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerControlsController.kt"
+    "app/src/main/java/ru/evrasia/research/NetworkDebuggerDetailViews.kt",
+    "app/src/main/java/ru/evrasia/research/NetworkDebuggerDetailsController.kt"
   ]
 }
