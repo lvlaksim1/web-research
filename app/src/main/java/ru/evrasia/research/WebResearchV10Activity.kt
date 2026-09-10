@@ -330,6 +330,23 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
     }
 
+    private fun applyAccentColor(color: Int, persist: Boolean) {
+        val opaque = color or 0xFF000000.toInt()
+        if (persist) WebUiTheme.saveAccentColor(this, opaque)
+        palette = palette.copy(accent = opaque)
+        if (::pageAction.isInitialized) pageAction.setTextColor(opaque)
+        if (::zipButton.isInitialized) zipButton.setTextColor(opaque)
+        if (::menuButton.isInitialized) menuButton.foreground = TechIconDrawable(TechIconDrawable.Kind.MENU, opaque)
+        if (::networkButton.isInitialized) networkButton.foreground = TechIconDrawable(TechIconDrawable.Kind.NETWORK, opaque)
+        if (::networkBadge.isInitialized) {
+            networkBadge.setTextColor(WebUiTheme.contrastText(opaque))
+            networkBadge.background = rounded(opaque, 9f)
+        }
+        if (::progress.isInitialized) progress.progressTintList = ColorStateList.valueOf(opaque)
+        if (::swipeRefresh.isInitialized) swipeRefresh.setColorSchemeColors(opaque)
+        if (::menuController.isInitialized) menuController.updateAccent(opaque)
+    }
+
     private fun iconButton(kind: TechIconDrawable.Kind, strong: Boolean, click: () -> Unit) = Button(this).apply {
         text = ""
         contentDescription = when (kind) {
