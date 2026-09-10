@@ -418,7 +418,7 @@ class CookieTraceProvider : ContentProvider(), Application.ActivityLifecycleCall
             val origin = CookieTraceSupport.currentOrigin(history, value)
             root.addView(cookieRow(activity, name, value, CookieTraceSupport.sourceShort(origin), true) {
                 dialog?.dismiss()
-                showCookieDetails(activity, name, value, page, host, true)
+                showCookieDetails(activity, name, value, host, true)
             })
         }
 
@@ -429,7 +429,7 @@ class CookieTraceProvider : ContentProvider(), Application.ActivityLifecycleCall
                 val latest = history.lastOrNull()
                 root.addView(cookieRow(activity, name, latest?.optString("value", "").orEmpty(), CookieTraceSupport.sourceShort(latest), false) {
                     dialog?.dismiss()
-                    showCookieDetails(activity, name, null, page, host, false)
+                    showCookieDetails(activity, name, null, host, false)
                 })
             }
         }
@@ -468,136 +468,28 @@ class CookieTraceProvider : ContentProvider(), Application.ActivityLifecycleCall
         }.also { (it.layoutParams as? LinearLayout.LayoutParams) }
     }
 
-    private fun showCookieDetails(activity: NetworkDebuggerActivity, name: String, currentValue: String?, page: String, host: String, active: Boolean) {
-        val history = events.filter { it.optString("name") == name && relevantToHost(it, host) }.sortedBy { it.optLong("time", 0L) }
-        val birth = CookieTraceSupport.birthEvent(history)
-        val origin = CookieTraceSupport.currentOrigin(history, currentValue)
-        val regen = CookieTraceSupport.regenerationEvent(history, currentValue)
-
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(activity, 10), dp(activity, 8), dp(activity, 10), dp(activity, 12))
-            setBackgroundColor(ink)
-        }
-
-        root.addView(block(activity, buildString {
-            append(name)
-            append(if (active) "\n\nТЕКУЩЕЕ ЗНАЧЕНИЕ\n${currentValue.orEmpty()}" else "\n\nСейчас cookie не активна")
-        }, true))
-
-        root.addView(sectionText(activity, "КАК ОНА РОДИЛАСЬ"))
-        root.addView(block(activity, if (birth == null) "Рождение не зафиксировано. Cookie могла существовать до запуска трассировки." else CookieTraceSupport.formatOrigin(birth), false))
-
-        if (origin != null && origin !== birth) {
-            root.addView(sectionText(activity, "ИСТОЧНИК ТЕКУЩЕГО ЗНАЧЕНИЯ"))
-            root.addView(block(activity, CookieTraceSupport.formatOrigin(origin), false))
-        }
-
-        root.addView(sectionText(activity, "КАК ПОЛУЧИТЬ ЕЁ СНОВА"))
-        val recipe = regenerationRecipe(regen)
-        root.addView(block(activity, recipe, false))
-
-        if (regen != null) {
-            when (regen.optString("origin", "")) {
-                "HTTP_RESPONSE", "LIKELY_HTTP_RESPONSE" -> {
-                    val url = regen.optString("url", "")
-                    if (url.startsWith("http://") || url.startsWith("https://")) {
-                        root.addView(actionButton(activity, if (regen.optString("confidence") == "EXACT") "ПОВТОРИТЬ ИСХОДНЫЙ ЗАПРОС" else "ПОВТОРИТЬ ВЕРОЯТНЫЙ ЗАПРОС") {
-                            val headers = CookieTraceSupport.headersMap(regen.optJSONObject("requestHeaders"))
-                            val original = JSONObject().put("url", url).put("method", regen.optString("method", "GET"))
-                            if (regen.has("_storeId")) original.put("_storeId", regen.optLong("_storeId"))
-                            val ok = NetworkRequestActions.replay(activity, original, regen.optString("method", "GET"), url, headers, regen.optString("requestBody", ""))
-                            Toast.makeText(activity, if (ok) "Запрос отправляется" else "Не удалось повторить запрос", Toast.LENGTH_SHORT).show()
-                        })
-                        root.addView(actionButton(activity, "КОПИРОВАТЬ cURL") { copyText(activity, "cURL", CookieTraceSupport.curlFor(regen)) })
-                    }
-                }
-                "JAVASCRIPT" -> {
-                    val raw = regen.optString("raw", "")
-                    if (raw.isNotBlank()) root.addView(actionButton(activity, "КОПИРОВАТЬ JS SETTER") { copyText(activity, "JS setter", CookieTraceSupport.jsSetter(regen)) })
-                }
-            }
-        }
-
-        root.addView(sectionText(activity, "ИСТОРИЯ"))
-        if (history.isEmpty()) root.addView(block(activity, "История пока отсутствует.", false))
-        history.asReversed().forEach { root.addView(block(activity, CookieTraceSupport.formatHistory(it), false)) }
-
-        val scroll = ScrollView(activity).apply { setBackgroundColor(ink); addView(root) }
-        val dialog = AlertDialog.Builder(activity).setTitle("COOKIE · $name").setView(scroll).setNegativeButton("Назад", null).create()
-        dialog.setOnShowListener {
-            dialog.window?.setLayout((activity.resources.displayMetrics.widthPixels * 0.97).toInt(), (activity.resources.displayMetrics.heightPixels * 0.92).toInt())
-            dialog.window?.setBackgroundDrawable(round(activity, ink, 16, line))
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.apply {
-                setTextColor(cyan)
-                setOnClickListener { dialog.dismiss(); showCookieList(activity) }
-            }
-        }
-        dialog.show()
-    }
-
-    private fun regenerationRecipe(event: JSONObject?): String {
-        if (event == null) return "Недостаточно данных, чтобы предложить способ воспроизведения. Нужно поймать момент создания cookie после запуска приложения."
-        return when (event.optString("origin", "")) {
-            "HTTP_RESPONSE" -> buildString {
-                append("Cookie пришла в ответе Set-Cookie. Чтобы сервер сгенерировал её снова, повторите исходный HTTP-запрос.\n\n")
-                append(CookieTraceSupport.requestRecipe(event))
-                append("\n\nНиже есть кнопка повторения запроса. Новый ответ может выдать новое значение cookie, если серверная логика допускает повторную генерацию.")
-            }
-            "LIKELY_HTTP_RESPONSE" -> buildString {
-                append("Cookie появилась сразу после этого запроса, но Set-Cookie в исходном ответе перехватить не удалось. Поэтому источник вероятный, а не доказанный.\n\n")
-                append(CookieTraceSupport.requestRecipe(event))
-                append("\n\nМожно повторить этот запрос и проверить, создастся ли cookie снова.")
-            }
-            "JAVASCRIPT" -> buildString {
-                append("Cookie записана JavaScript через ").append(event.optString("mechanism", "JavaScript")).append(".\n")
-                val stack = event.optString("stack", "")
-                if (stack.isNotBlank()) append("Главный ориентир — JS stack ниже: он показывает код, который выполнил запись.\n")
-                append("\nДля точного воспроизведения нового значения нужно повторить действие сайта, которое приводит к этому вызову. Простое повторение setter-а обычно лишь запишет старое значение.\n\n")
-                append("Setter для проверки:\n").append(CookieTraceSupport.jsSetter(event))
-            }
-            else -> "Источник рождения пока не доказан. Трассировка видит факт появления/изменения cookie, но не может гарантированно назвать код или HTTP-ответ, создавший её."
-        }
-    }
-
-    private fun copyText(activity: Activity, label: String, value: String) {
-        val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText(label, value))
-        Toast.makeText(activity, "$label скопирован", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun block(activity: Activity, textValue: String, strong: Boolean): TextView = TextView(activity).apply {
-        text = textValue
-        setTextColor(if (strong) white else white)
-        textSize = if (strong) 11f else 10f
-        typeface = if (strong) Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) else Typeface.MONOSPACE
-        setTextIsSelectable(true)
-        isFocusable = true
-        isFocusableInTouchMode = true
-        setPadding(dp(activity, 10), dp(activity, 9), dp(activity, 10), dp(activity, 9))
-        background = round(activity, surface2, 9, line)
-    }
-
-    private fun sectionText(activity: Activity, value: String): TextView = TextView(activity).apply {
-        text = value
-        setTextColor(cyan)
-        textSize = 9f
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        letterSpacing = .08f
-        setPadding(dp(activity, 4), dp(activity, 10), dp(activity, 4), dp(activity, 5))
-    }
-
-    private fun actionButton(activity: Activity, label: String, click: () -> Unit): Button = Button(activity).apply {
-        text = label
-        isAllCaps = false
-        setTextColor(cyan)
-        textSize = 9.5f
-        typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        minHeight = 0
-        minimumHeight = 0
-        setPadding(dp(activity, 9), 0, dp(activity, 9), 0)
-        background = round(activity, surface, 9, line)
-        setOnClickListener { click() }
+    private fun showCookieDetails(
+        activity: NetworkDebuggerActivity,
+        name: String,
+        currentValue: String?,
+        host: String,
+        active: Boolean
+    ) {
+        val history = events
+            .filter { it.optString("name") == name && relevantToHost(it, host) }
+            .sortedBy { it.optLong("time", 0L) }
+        CookieTraceDetailsDialog.show(
+            activity = activity,
+            name = name,
+            currentValue = currentValue,
+            active = active,
+            history = history,
+            options = CookieTraceDetailsDialog.Options(
+                verboseActions = true,
+                directClipboard = true
+            ),
+            onBack = { showCookieList(activity) }
+        )
     }
 
     private fun exportJson(page: String): JSONObject {
