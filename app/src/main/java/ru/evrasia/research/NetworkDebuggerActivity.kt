@@ -17,7 +17,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
 
 class NetworkDebuggerActivity : AppCompatActivity() {
-    private val background get() = WebUiTheme.palette(this).background
+    private val screenBackground get() = WebUiTheme.palette(this).background
 
     private lateinit var list: ListView
     private lateinit var adapter: NetworkDebuggerEventAdapter
@@ -46,8 +46,8 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         WebUiTheme.applySaved(this)
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = background
-        window.navigationBarColor = background
+        window.statusBarColor = screenBackground
+        window.navigationBarColor = screenBackground
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !WebUiTheme.palette(this@NetworkDebuggerActivity).dark
             isAppearanceLightNavigationBars = !WebUiTheme.palette(this@NetworkDebuggerActivity).dark
@@ -55,13 +55,13 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(background)
+            setBackgroundColor(screenBackground)
         }
 
         list = ListView(this).apply {
             divider = null
             dividerHeight = dp(2)
-            setBackgroundColor(background)
+            setBackgroundColor(screenBackground)
             setPadding(dp(4), dp(4), dp(4), dp(4))
             clipToPadding = false
         }
