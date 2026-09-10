@@ -3,6 +3,33 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v16-START -->
+## v16 — 2026-09-10T01:54:40Z
+
+- Release commit: `9af900940abfc3a791d34700a2407e6c330c9082`
+- Artifact: `web-research-v16.apk`
+- SHA-256: `b5562228e04a2c2de6b0daf3095937a5cc7602d169b225a016c2e616544d2539`
+- Previous release: **v15**
+
+### Changes
+
+- refactor: split debugger projection and text formatting
+- refactor: centralize shared cookie trace logic
+- refactor: separate raw archive from export generation
+- release: publish refactoring stages 2-4 [release]
+
+### Changed files
+
+- `app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt`
+- `app/src/main/java/ru/evrasia/research/CookieTraceSupport.kt`
+- `app/src/main/java/ru/evrasia/research/CookieTraceUiProvider.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerProjection.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerText.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchive.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchExportController.kt`
+<!-- AUTO-CHANGELOG-v16-END -->
 <!-- AUTO-CHANGELOG-v15-START -->
 ## v15 — 2026-09-10T01:35:51Z
 
