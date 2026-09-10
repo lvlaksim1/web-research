@@ -77,6 +77,7 @@ jobs:
       - name: Regenerate release documentation
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_NUMBER: ${{ needs.release-apk.outputs.release_number }}
           APK_FILENAME: ${{ steps.release.outputs.apk_filename }}
           APK_SHA256: ${{ steps.release.outputs.sha256 }}
           PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
