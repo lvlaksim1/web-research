@@ -1,6 +1,6 @@
 # Architecture
 
-Документ описывает текущее архитектурное состояние `web-research` и ключевые инварианты, которые должны сохраняться при дальнейшем рефакторинге.
+Документ описывает фактическую архитектуру `web-research` после серии рефакторингов v18–v25 и ключевые инварианты, которые должны сохраняться дальше.
 
 <!-- AUTO-RELEASE-START -->
 ## Контрольная точка документа
@@ -10,54 +10,117 @@
 - Опубликован: `2026-09-10T10:06:39Z`
 <!-- AUTO-RELEASE-END -->
 
-## Критический инвариант данных
+## Главная цель проекта
 
-`ResearchArchive.records` является источником сырых событий для ZIP/HAR и других экспортов.
+Максимально полно зафиксировать текущую реальную браузерную сессию и сохранить исходные данные в ZIP для последующего анализа. Автоматическое построение Postman/AUTH-replay не является целью проекта.
 
-Последовательность должна оставаться такой:
+## Критический инвариант raw-данных
+
+`ResearchArchive.records` — источник исходных событий сессии. Событие сначала фиксируется в raw archive и только после этого попадает в производный debugger pipeline.
 
 ```text
-событие браузера / сети
+browser / network event
         ↓
-ResearchArchive
+ResearchArchive.records   ← RAW, не модифицируется debugger-ом
         ↓
 NetworkRecordPipeline
         ↓
-корреляция / debugger storage
+NetworkDebugStore
         ↓
-display-only transformations
+NetworkEventCorrelator
+        ↓
+debugger projection / display
 ```
 
-Корреляция, объединение записей, фильтрация и UI debugger-а не должны заменять, переписывать или сокращать исходный raw archive.
+`NetworkRecordPipeline` делает отдельную JSON-копию для debugger-а. Нормализация headers, корреляция, merge, фильтрация и display transformations не должны менять объект, уже помещённый в `ResearchArchive.records`.
 
-## Текущие границы приложения
+## Browser / capture слой
 
-- `WebResearchV10Activity` — основной экран браузера и верхнеуровневая Android-оркестрация.
-- `WebCaptureController` — instrumentation, page snapshots, JavaScript bridge и сбор chunk-данных.
-- `WebResearchScripts` — JavaScript payloads для захвата browser-side событий.
-- `WebResourceCapture` — копирование ресурсов и внешних scripts.
-- `WebResearchWebViewController` — WebViewClient/WebChromeClient и маршрутизация событий WebView.
+- `WebResearchV10Activity` — lifecycle и верхнеуровневая оркестрация браузера. Она связывает контроллеры, но не должна содержать большие UI-подсистемы или capture-алгоритмы.
+- `WebResearchBrowserLayout` — построение основного browser UI: toolbar, address bar, ZIP, Network, badge, progress, WebView container.
+- `WebResearchMenuController` — меню браузера, bookmarks, cookies UI, theme/accent и About.
+- `WebResearchWebViewController` — WebViewClient/WebChromeClient и события WebView.
 - `WebNavigationController` — URL normalization и navigation.
 - `WebBookmarkController` — bookmarks.
-- `WebCookieStatsController` — статистика cookies.
-- `WebDownloadController` — обработка скачиваний, инициированных сайтом.
-- `WebResearchExportController` — lifecycle ZIP-экспорта.
-- `ResearchArchive` — raw capture state и построение экспортируемого архива.
-- `NetworkRecordPipeline` — граница raw archive → debugger.
-- `NetworkDebugStore` — correlated debugger storage.
-- `NetworkEventCorrelator` — политика корреляции сетевых событий.
-- `NetworkDisplayMerger` — display-only объединение записей.
-- `NetworkEventClassifier` — классификация событий для debugger-а.
-- `NetworkDebuggerDataSource` — синхронизация debugger UI с хранилищем.
-- `NetworkDebuggerActivity` — основной UI анализа сетевых событий.
-- `NetworkReplayController` — EDIT / REPLAY.
-- `NetworkRequestActions` — вспомогательные действия над запросами, включая GET BODY/replay.
-- `ResearchSecretRedactor` — редактирование чувствительных данных в производных представлениях.
-- `ResultDelivery` — сохранение/шаринг подготовленных файлов.
-- `WebUiTheme` и `AccentColorPickerView` — theme/accent UI.
+- `WebDownloadController` — скачивания, инициированные сайтом.
+- `WebCaptureController` — запуск browser-side instrumentation, snapshots, JS bridge и сбор chunk-артефактов.
+- `WebResearchScripts` — JavaScript instrumentation для fetch/XHR/navigation/history/actions/storage/DOM/performance/realtime и связанных browser-side событий.
+- `WebResourceCapture` — сохранение доступных ресурсов и внешних JavaScript-файлов.
 
-## Исторический контекст
+## Raw archive и экспорт
 
-До текущей структуры проект проходил серию выделений ответственности из монолитных Activity/utility-классов: capture orchestration, resource capture, JavaScript payloads, replay, correlation, navigation/bookmarks/cookies, WebView orchestration, ZIP export и raw-to-debugger pipeline были последовательно вынесены в отдельные компоненты.
+`ResearchArchive` отвечает только за mutable state текущей исследовательской сессии:
 
-При последующих изменениях важнее сохранять текущие границы и инварианты, чем старую нумерацию промежуточных рефакторингов.
+- `records`;
+- scripts и script errors;
+- resources и resource metadata;
+- extra artifacts;
+- page snapshot;
+- clear/reset.
+
+`ResearchArchiveExporter` является отдельным read/export слоем и строит:
+
+- `raw-events.json`;
+- `network.har`;
+- `api-summary.json`;
+- `actions.json`;
+- `dom-mutations.json`;
+- `realtime.json`;
+- `performance.json`;
+- `page-snapshot.json` и `page.html`;
+- `js/manifest.json` и JavaScript-файлы;
+- `resources/manifest.json` и ресурсы;
+- browser artifacts.
+
+`WebResearchExportController` управляет lifecycle ZIP-экспорта и вызывает `ResearchArchiveExporter`. Export-код не должен изменять raw state.
+
+## Network debugger
+
+`NetworkDebuggerActivity` после декомпозиции является UI-orchestrator, а не монолитным debugger-ом.
+
+Его компоненты:
+
+- `NetworkDebuggerDataSource` — получение изменений из `NetworkDebugStore`.
+- `NetworkDebuggerProjection` — фильтрация, realtime session projection, CHANGED и counters.
+- `NetworkDebuggerEventAdapter` — rendering списка событий.
+- `NetworkDebuggerRowPresentation` — presentation rules и row flags.
+- `NetworkDebuggerControlsController` — нижняя панель, filters, search, merge mode и popup UI.
+- `NetworkDebuggerDetailsController` — orchestration окна деталей request/response.
+- `NetworkDebuggerDetailViews` — JSON tree, highlighting, collapsible sections и detail UI primitives.
+- `NetworkDebuggerRealtimeController` — realtime session dialog.
+- `NetworkDebuggerText` — форматирование request/response/headers/cURL/body/timing.
+- `NetworkDisplayMerger` — display-only merge.
+- `NetworkEventClassifier` — классификация событий.
+- `NetworkEventCorrelator` — политика корреляции производных debugger-событий.
+- `NetworkReplayController` и `NetworkRequestActions` — EDIT/REPLAY и вспомогательные действия. Replay — аналитический инструмент и не является источником raw browser traffic.
+
+## Cookie Trace
+
+Cookie Trace разделён на четыре ответственности:
+
+- `CookieTraceProvider` — lifecycle bridge между браузером, engine и UI.
+- `CookieTraceEngine` — JS cookie hooks, Set-Cookie ingestion, snapshots/diff, связь изменений cookie с HTTP-событиями, confidence/origin и `cookie-trace.json`.
+- `CookieTraceSupport` — общая предметная логика и форматирование происхождения/истории cookie.
+- `CookieTraceDetailsDialog` — общий details/replay UI.
+- `CookieTraceUiProvider` — интерфейс навигации по cookie trace данным.
+
+Cookie Trace — производный аналитический слой. Он не должен заменять или сокращать исходные cookie/network evidence в `ResearchArchive`.
+
+## UI и служебные компоненты
+
+- `WebUiTheme` и `AccentColorPickerView` — theme/accent.
+- `TechIconDrawable` — технические иконки.
+- `ResultDelivery` — сохранение/шаринг подготовленного текста и бинарных файлов.
+
+## Границы, которые не следует снова смешивать
+
+1. raw capture ≠ debugger correlation/display;
+2. raw state ≠ export generation;
+3. browser orchestration ≠ menu/layout construction;
+4. cookie capture/inference ≠ cookie UI;
+5. debugger data/projection ≠ row/detail rendering;
+6. реальный browser traffic ≠ аналитический replay.
+
+## Критерий дальнейшего рефакторинга
+
+Дальнейшее выделение классов оправдано только при наличии одной из причин: несколько независимых ответственностей, фактическое дублирование, трудность детерминированного тестирования или реальный риск изменения raw capture. Уменьшение файла само по себе больше не является целью.
