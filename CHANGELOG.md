@@ -3,6 +3,28 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v25-START -->
+## v25 — 2026-09-10T10:06:39Z
+
+- Release commit: `485dcfbfd37a54e87174ed7551f577d8373b6421`
+- Artifact: `web-research-v25.apk`
+- SHA-256: `dbfcf5e671790d6fa1d3a2088fcc34675d40a8514de91c40d1a9760bc0519833`
+- Previous release: **v24**
+
+### Changes
+
+- fix: remove stale debugger counter and dead activity state
+- fix: qualify debugger background color
+- ci: update README and refactoring docs on every release
+- release: publish debugger activity cleanup [release]
+
+### Changed files
+
+- `.github/scripts/update-release-docs.py`
+- `.github/workflows/android-apk.yml`
+- `.github/workflows/validate-work-branches.yml`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt`
+<!-- AUTO-CHANGELOG-v25-END -->
 <!-- AUTO-CHANGELOG-v24-START -->
 ## v24 — 2026-09-10T09:47:49Z
 

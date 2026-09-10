@@ -1,22 +1,27 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 24,
-  "tag": "v24",
-  "versionCode": 24,
-  "versionName": "v24",
+  "releaseNumber": 25,
+  "tag": "v25",
+  "versionCode": 25,
+  "versionName": "v25",
   "packageId": "web.research",
-  "commit": "a56bce81b33f5f22e0d263c1d9b6e9493af75f71",
-  "artifact": "web-research-v24.apk",
-  "sha256": "26cc6df2aeece39d5ce33960129b306b33cdfcebc22767bd6a67be83ac154205",
-  "publishedAt": "2026-09-10T09:47:49Z",
-  "previousRelease": "v23",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v24",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v24/web-research-v24.apk",
+  "commit": "485dcfbfd37a54e87174ed7551f577d8373b6421",
+  "artifact": "web-research-v25.apk",
+  "sha256": "dbfcf5e671790d6fa1d3a2088fcc34675d40a8514de91c40d1a9760bc0519833",
+  "publishedAt": "2026-09-10T10:06:39Z",
+  "previousRelease": "v24",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v25",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v25/web-research-v25.apk",
   "commits": [
-    "refactor: reduce cookie trace provider to lifecycle bridge",
-    "release: publish cookie provider cleanup [release]"
+    "fix: remove stale debugger counter and dead activity state",
+    "fix: qualify debugger background color",
+    "ci: update README and refactoring docs on every release",
+    "release: publish debugger activity cleanup [release]"
   ],
   "changedFiles": [
-    "app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt"
+    ".github/scripts/update-release-docs.py",
+    ".github/workflows/android-apk.yml",
+    ".github/workflows/validate-work-branches.yml",
+    "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt"
   ]
 }
