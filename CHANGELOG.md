@@ -3,6 +3,23 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v14-START -->
+## v14 — 2026-09-10T01:07:37Z
+
+- Release commit: `9f1c626114450c00669dbe0b90fa65812d5343eb`
+- Artifact: `web-research-v14.apk`
+- SHA-256: `330fe5fbd9d4c2036da752f18bf7828b542abb6aa7f0245f0f16e578378f585f`
+- Previous release: **v13**
+
+### Changes
+
+- ci: recover standardized release documentation for v13
+- docs: verify standardized release documentation automation [release]
+
+### Changed files
+
+- `.github/workflows/android-apk.yml`
+<!-- AUTO-CHANGELOG-v14-END -->
 <!-- AUTO-CHANGELOG-v13-START -->
 ## v13 — 2026-09-10T01:00:17Z
 
