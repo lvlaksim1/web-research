@@ -3,6 +3,26 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v19-START -->
+## v19 — 2026-09-10T03:00:14Z
+
+- Release commit: `446e068856bc05d77514f543938075b54e5f2a8b`
+- Artifact: `web-research-v19.apk`
+- SHA-256: `0c33b9ed2276c560d5b3d4236ea4db3562e0e093979308dc45567c816a8651f9`
+- Previous release: **v18**
+
+### Changes
+
+- refactor: extract debugger details controller
+- refactor: extract realtime session dialog
+- release: publish debugger details and realtime refactor [release]
+
+### Changed files
+
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerDetailsController.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkDebuggerRealtimeController.kt`
+<!-- AUTO-CHANGELOG-v19-END -->
 <!-- AUTO-CHANGELOG-v18-START -->
 ## v18 — 2026-09-10T02:23:03Z
 
