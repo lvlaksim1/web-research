@@ -49,7 +49,6 @@ class WebResearchV10Activity : AppCompatActivity() {
     internal fun researchWebView(): WebView? = if (::web.isInitialized) web else null
     internal fun researchArchive(): ResearchArchive = archive
     internal fun researchUserAgent(): String = if (::userAgent.isInitialized) userAgent else ""
-    internal fun captureResearchSnapshot() { if (::captureController.isInitialized) captureController.capturePageSnapshot() }
     internal fun clearResearchSession() {
         archive.clear()
         NetworkDebugStore.clear()

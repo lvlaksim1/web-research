@@ -4,7 +4,6 @@ import android.app.Activity
 import android.webkit.CookieManager
 import android.webkit.WebView
 import org.json.JSONObject
-import java.io.OutputStream
 import java.lang.ref.WeakReference
 import java.net.HttpURLConnection
 import java.net.URL
@@ -14,26 +13,11 @@ import java.util.Locale
 object NetworkRequestActions {
     private const val MAX_TEXT_BODY = 4 * 1024 * 1024
 
-    fun prepareFullExport(activity: Activity) {
-        val browser = activeBrowser(activity) ?: return
-        browser.captureResearchSnapshot()
-    }
 
     fun clearFullSession(activity: Activity): Boolean {
         val browser = activeBrowser(activity) ?: return false
         browser.clearResearchSession()
         return true
-    }
-
-    fun writeFullExport(activity: Activity, output: OutputStream): Boolean {
-        val browser = activeBrowser(activity) ?: return false
-        val archive = archiveOf(browser) ?: return false
-        return try {
-            archive.writeZip(output, currentUrl(browser))
-            true
-        } catch (_: Exception) {
-            false
-        }
     }
 
     fun fetchMissingBody(activity: Activity, event: JSONObject): Boolean {
@@ -216,7 +200,6 @@ object NetworkRequestActions {
 
     private fun archiveOf(browser: WebResearchV10Activity): ResearchArchive? = browser.researchArchive()
 
-    private fun currentUrl(browser: WebResearchV10Activity): String = browser.researchWebView()?.url.orEmpty()
 
     private fun browserUserAgent(browser: WebResearchV10Activity?): String = browser?.researchUserAgent().orEmpty()
 

@@ -52,8 +52,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.LinkedHashMap
 import java.util.Locale
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class NetworkDebuggerActivity : AppCompatActivity() {
     private val bg get() = WebUiTheme.palette(this).background
@@ -89,10 +87,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private var lastRevision = -1L
     private var mergeMode = false
-    private var pendingBinary: ByteArray? = null
-    private var pendingBinaryName = "response.bin"
-    private var pendingBinaryMime = "application/octet-stream"
-
     private val displaySourceOrder = listOf("webview","fetch","xhr","resource-timing","resource-copy","replay","fetch-meta","xhr-meta")
     private val typeFilters = listOf("ALL","JSON","HTML","JS","CSS","IMG","PDF","TEXT","BIN","OTHER")
     private val methodFilters = listOf("ALL","GET","POST","PUT","PATCH","DELETE","OPTIONS","HEAD","WS","SSE","OTHER")
@@ -459,26 +453,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         domainSpinner.adapter=spinnerAdapter(domains)
         domainSpinner.setSelection(domains.indexOf(selectedDomain).takeIf{it>=0}?:0)
         attachFilterListener(domainSpinner)
-    }
-
-    private fun filterCard(label:String,spinner:Spinner,width:Int)=LinearLayout(this).apply{
-        orientation=LinearLayout.VERTICAL
-        gravity=Gravity.CENTER_VERTICAL
-        background=rounded(panel,12f,line)
-        setPadding(dp(9),dp(4),dp(7),dp(4))
-        addView(TextView(this@NetworkDebuggerActivity).apply{
-            text=label
-            setTextColor(muted)
-            textSize=7.5f
-            typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD)
-            letterSpacing=.08f
-            setPadding(dp(2),0,dp(2),0)
-        },LinearLayout.LayoutParams(-1,dp(14)))
-        spinner.background=rounded(panel2,8f,Color.TRANSPARENT)
-        spinner.setPopupBackgroundDrawable(rounded(panel,12f,line))
-        spinner.dropDownVerticalOffset=dp(4)
-        addView(spinner,LinearLayout.LayoutParams(-1,dp(32)))
-        layoutParams=LinearLayout.LayoutParams(width,dp(56))
     }
 
     private fun spinnerAdapter(values:List<String>)=object:ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,values){
@@ -1166,34 +1140,12 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         if(headers==null)return "";val it=headers.keys();while(it.hasNext()){val key=it.next();if(key.equals(name,true))return headers.optString(key,"")};return ""
     }
 
-    private fun exportZip(){
-        NetworkRequestActions.prepareFullExport(this)
-        val stamp=SimpleDateFormat("yyyyMMdd-HHmmss",Locale.US).format(Date())
-        ResultDelivery.deliverGeneratedFile(this,"Экспорт ZIP","web-research-$stamp.zip","application/zip"){out->
-            if(!NetworkRequestActions.writeFullExport(this,out))writeTraceFallback(out)
-        }
-    }
-
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
-        super.onActivityResult(requestCode,resultCode,data);if(ResultDelivery.handleActivityResult(this,requestCode,resultCode,data))return;if(resultCode!=RESULT_OK)return
-        if(requestCode==701){
-            data?.data?.let{uri->contentResolver.openOutputStream(uri)?.use{out->if(!NetworkRequestActions.writeFullExport(this,out))writeTraceFallback(out)}}
-            Toast.makeText(this,"Полный ZIP экспортирован",Toast.LENGTH_SHORT).show()
-        }else if(requestCode==702){
-            val bytes=pendingBinary;if(bytes!=null){data?.data?.let{uri->contentResolver.openOutputStream(uri)?.use{it.write(bytes)}};Toast.makeText(this,"Бинарный ответ сохранён",Toast.LENGTH_SHORT).show()};pendingBinary=null
-        }
+        super.onActivityResult(requestCode,resultCode,data)
+        ResultDelivery.handleActivityResult(this,requestCode,resultCode,data)
     }
 
-    private fun writeTraceFallback(output:java.io.OutputStream){
-        ZipOutputStream(output).use{z->addZip(z,"network-events.json",JSONObject().put("recording",NetworkDebugStore.recording).put("events",NetworkDebugStore.json()).toString(2));addZip(z,"cookies.json",buildCookiesJson().toString(2))}
-    }
-
-    private fun buildCookiesJson():JSONArray{
-        val out=JSONArray();val seen=mutableSetOf<String>();allItems.forEach{event->val url=eventLocation(event);hostOf(url)?.let{host->if(seen.add(host))out.put(JSONObject().put("host",host).put("url",url).put("cookie",CookieManager.getInstance().getCookie(url).orEmpty()))}};return out
-    }
-
-    private fun addZip(z:ZipOutputStream,name:String,text:String){z.putNextEntry(ZipEntry(name));z.write(text.toByteArray(Charsets.UTF_8));z.closeEntry()}
     private fun dp(v:Int)=(v*resources.displayMetrics.density).toInt()
     private fun rounded(fill:Int,radius:Float,stroke:Int=Color.TRANSPARENT)=GradientDrawable().apply{shape=GradientDrawable.RECTANGLE;setColor(fill);cornerRadius=dp(radius.toInt()).toFloat();if(stroke!=Color.TRANSPARENT)setStroke(dp(1),stroke)}
     private fun compactButton(label:String,click:()->Unit)=Button(this).apply{text=label;setTextColor(textColor);textSize=10f;isAllCaps=false;minWidth=0;minimumWidth=0;minHeight=0;minimumHeight=0;setPadding(dp(10),0,dp(10),0);background=rounded(panel2,10f,line);setOnClickListener{click()}}
