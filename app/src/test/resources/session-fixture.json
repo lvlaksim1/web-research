@@ -1,0 +1,90 @@
+{
+  "page": "https://example.test/app",
+  "events": [
+    {
+      "source": "webview",
+      "time": 1000,
+      "method": "GET",
+      "url": "https://example.test/api/items?limit=10",
+      "headers": {"X-Legacy": "legacy-value"}
+    },
+    {
+      "source": "fetch",
+      "time": 1050,
+      "method": "GET",
+      "url": "https://example.test/api/items?limit=10",
+      "status": 200,
+      "mimeType": "application/json",
+      "requestHeaders": {"Accept": "application/json"},
+      "responseHeaders": {"Content-Type": "application/json", "ETag": "v1"},
+      "responseBody": "{\"items\":[1,2,3]}",
+      "duration": 42
+    },
+    {
+      "source": "fetch",
+      "time": 2000,
+      "method": "POST",
+      "url": "https://example.test/api/login",
+      "status": 201,
+      "requestMimeType": "application/x-www-form-urlencoded",
+      "requestBody": "user=test&mode=full",
+      "responseHeaders": {"Content-Type": "application/json", "Set-Cookie": "session=abc; Path=/; HttpOnly"},
+      "responseBody": "{\"ok\":true}"
+    },
+    {
+      "source": "user-action",
+      "time": 3000,
+      "action": "click",
+      "page": "https://example.test/app",
+      "target": {"tag": "button", "id": "save", "text": "Save"}
+    },
+    {
+      "source": "websocket-open",
+      "time": 4000,
+      "url": "wss://example.test/socket",
+      "state": "open"
+    },
+    {
+      "source": "websocket-send",
+      "time": 4010,
+      "url": "wss://example.test/socket",
+      "data": "ping"
+    },
+    {
+      "source": "websocket-receive",
+      "time": 4020,
+      "url": "wss://example.test/socket",
+      "data": "pong"
+    },
+    {
+      "source": "sse-open",
+      "time": 5000,
+      "url": "https://example.test/events",
+      "state": "open"
+    },
+    {
+      "source": "sse-message",
+      "time": 5010,
+      "url": "https://example.test/events",
+      "data": "update"
+    },
+    {
+      "source": "navigation",
+      "time": 6000,
+      "url": "https://example.test/next",
+      "page": "https://example.test/next"
+    },
+    {
+      "source": "dom-mutation",
+      "time": 7000,
+      "page": "https://example.test/next",
+      "mutation": "childList"
+    },
+    {
+      "source": "performance",
+      "time": 8000,
+      "page": "https://example.test/next",
+      "metric": "paint"
+    }
+  ]
+}

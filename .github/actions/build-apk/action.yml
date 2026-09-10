@@ -1,5 +1,5 @@
 name: L3 Project APK Builder
-description: Build the project-specific unsigned APK candidate
+description: Test and build the project-specific unsigned APK candidate
 
 inputs:
   release_number:
@@ -17,13 +17,13 @@ runs:
     - name: Set up project Gradle
       uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
-    - name: Build project release APK
+    - name: Run regression tests and build release APK
       env:
         RELEASE_VERSION_CODE: ${{ inputs.release_number }}
       shell: bash
       run: |
         set -euo pipefail
-        ./gradlew :app:assembleRelease
+        ./gradlew :app:testReleaseUnitTest :app:assembleRelease
 
     - name: Return APK candidate
       id: result
