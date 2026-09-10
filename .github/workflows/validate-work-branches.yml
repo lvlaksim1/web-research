@@ -18,3 +18,41 @@ jobs:
       expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
     secrets:
       ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+
+  validate-release-docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository with release history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify documentation generator against latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/releases/latest")
+          RELEASE_TAG=$(printf '%s' "$RELEASE_JSON" | jq -r '.tag_name // empty')
+          RELEASE_COMMIT=$(printf '%s' "$RELEASE_JSON" | jq -r '.target_commitish // empty')
+          PUBLISHED_AT=$(printf '%s' "$RELEASE_JSON" | jq -r '.published_at // empty')
+          APK_FILENAME=$(printf '%s' "$RELEASE_JSON" | jq -r '.assets[]? | select(.name | endswith(".apk")) | .name' | head -1)
+          DIGEST=$(printf '%s' "$RELEASE_JSON" | jq -r --arg name "$APK_FILENAME" '.assets[]? | select(.name == $name) | .digest // empty' | head -1)
+
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+$ ]]
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$APK_FILENAME"
+          [[ "$DIGEST" == sha256:* ]]
+          APK_SHA256="${DIGEST#sha256:}"
+          [[ "$APK_SHA256" =~ ^[0-9a-fA-F]{64}$ ]]
+
+          git fetch --tags --force
+          python3 .github/scripts/update-release-docs.py             --release-tag "$RELEASE_TAG"             --release-commit "$RELEASE_COMMIT"             --artifact-filename "$APK_FILENAME"             --sha256 "$APK_SHA256"             --published-at "$PUBLISHED_AT"
+
+          git diff --check
+          git diff --exit-code -- README.md REFACTORING.md
+

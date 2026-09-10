@@ -1,84 +1,139 @@
 # Refactoring
 
-The refactoring series preserves application behavior and, in particular, keeps the raw research archive independent from the debugger correlation/display layer.
+Документ описывает текущее архитектурное состояние `web-research` и ключевые инварианты, которые должны сохраняться при дальнейшем рефакторинге.
 
-## Stage 1 — v51
-- Removed obsolete implementation generations and unused legacy components.
+<!-- AUTO-RELEASE-START -->
+## Состояние на v11
 
-## Stage 2 — v52
-- Removed the global AlertDialog sizing workaround from the application theme.
-- Preserved required debugger compatibility behavior after validation.
+- Релизный commit: `b43bc7abb7866725ef0e1f1f6b97a5100614610b`
+- Предыдущая контрольная точка: **v10**
+- APK: `web-research-v11.apk`
+- SHA-256: `3039bfc2a6d3ccd34efd7f41139647c78a21f5eb883c6de9410595960e625d9a`
 
-## Stage 3 — v53
-- Replaced reflection-based browser/archive access with explicit internal APIs.
-- Removed obsolete debugger compatibility code and build-time dialog source mutation.
+### Изменения между v10 и v11
 
-## Stage 4 — v54
-- Extracted display correlation into `NetworkDisplayMerger`.
-- Extracted endpoint grouping into `NetworkEndpointAnalyzer`.
-- Extracted network-event classification into `NetworkEventClassifier`.
+- ci: harden universal APK release standard
+- ci: enforce release permissions at workflow boundaries
+- ci: allow reusable release permission ceiling in validation
+- ci: accept hardened APK release standard [release]
+- ci: fix missing release detection
+- ci: accept hardened APK release standard [release]
 
-## Stage 5 — v55
-- Replaced versioned cookie provider names and JavaScript markers with stable names.
+### Затронутые файлы
 
-## Stage 6 — v56
-- Centralized `ResearchArchive` mutation methods.
-- Removed periodic archive-to-debugger mirroring.
-- Kept raw archive records as the source for HAR and raw export.
+- `.github/workflows/_release-apk.yml`
+- `.github/workflows/_release-core.yml`
+- `.github/workflows/android-apk.yml`
+- `.github/workflows/validate-work-branches.yml`
+<!-- AUTO-RELEASE-END -->
 
-## Stage 7 — v57
-- Extracted HTTP resource and external-script copying into `WebResourceCapture`.
+## Критический инвариант данных
 
-## Stage 8 — v58
-- Extracted browser JavaScript payloads into `WebResearchScripts` without rewriting their behavior.
+`ResearchArchive.records` является источником сырых событий для ZIP/HAR и других экспортов.
 
-## Stage 9 — v59
-- Extracted browser capture orchestration and JavaScript bridge handling into `WebCaptureController`.
+Последовательность должна оставаться такой:
 
-## Stage 10 — v60
-- Extracted request replay/editor behavior into `NetworkReplayController`.
+```text
+событие браузера / сети
+        ↓
+ResearchArchive
+        ↓
+NetworkRecordPipeline
+        ↓
+корреляция / debugger storage
+        ↓
+display-only transformations
+```
 
-## Stage 11 — v61
-- Extracted debugger event correlation/merge logic into `NetworkEventCorrelator`.
+Корреляция, объединение записей, фильтрация и UI debugger-а не должны заменять, переписывать или сокращать исходный raw archive.
 
-## Stage 12 — v62
-- Extracted browser navigation, bookmarks, and cookie-statistics controllers from `WebResearchV10Activity`.
+## Текущие границы приложения
 
-## Stage 13 — v63
-- Extracted incremental debugger-store synchronization into `NetworkDebuggerDataSource`.
+- `WebResearchV10Activity` — основной экран браузера и верхнеуровневая Android-оркестрация.
+- `WebCaptureController` — instrumentation, page snapshots, JavaScript bridge и сбор chunk-данных.
+- `WebResearchScripts` — JavaScript payloads для захвата browser-side событий.
+- `WebResourceCapture` — копирование ресурсов и внешних scripts.
+- `WebResearchWebViewController` — WebViewClient/WebChromeClient и маршрутизация событий WebView.
+- `WebNavigationController` — URL normalization и navigation.
+- `WebBookmarkController` — bookmarks.
+- `WebCookieStatsController` — статистика cookies.
+- `WebDownloadController` — обработка скачиваний, инициированных сайтом.
+- `WebResearchExportController` — lifecycle ZIP-экспорта.
+- `ResearchArchive` — raw capture state и построение экспортируемого архива.
+- `NetworkRecordPipeline` — граница raw archive → debugger.
+- `NetworkDebugStore` — correlated debugger storage.
+- `NetworkEventCorrelator` — политика корреляции сетевых событий.
+- `NetworkDisplayMerger` — display-only объединение записей.
+- `NetworkEventClassifier` — классификация событий для debugger-а.
+- `NetworkDebuggerDataSource` — синхронизация debugger UI с хранилищем.
+- `NetworkDebuggerActivity` — основной UI анализа сетевых событий.
+- `NetworkReplayController` — EDIT / REPLAY.
+- `NetworkRequestActions` — вспомогательные действия над запросами, включая GET BODY/replay.
+- `ResearchSecretRedactor` — редактирование чувствительных данных в производных представлениях.
+- `ResultDelivery` — сохранение/шаринг подготовленных файлов.
+- `WebUiTheme` и `AccentColorPickerView` — theme/accent UI.
 
-## Stage 14 — v64
-- Extracted WebView client orchestration into `WebResearchWebViewController`.
-- Extracted ZIP export lifecycle into `WebResearchExportController`.
+## Текущая архитектура релиза
 
-## Stage 15 — v65
-- Removed `TextColorCompat` and `SpinnerCompat` compatibility shims.
-- Replaced their remaining call sites with explicit platform APIs.
+### L1 — универсальное ядро
 
-## Stage 16 — v66
-- Added `NetworkRecordPipeline` as the explicit boundary between raw archive capture and correlated debugger storage.
-- Preserved the invariant that raw records are appended before debugger correlation.
-- Preserved debugger-only synthetic records for inline scripts.
-- Preserved `ResearchArchive.records` as the source for HAR, API summaries, source logs, and `raw-events.json`.
+`.github/workflows/_release-core.yml`
 
-## Current architecture boundaries
-- `WebResearchV10Activity`: browser screen and top-level Android lifecycle/orchestration.
-- `WebCaptureController`: browser instrumentation, snapshots, JavaScript bridge, chunk assembly.
-- `WebResourceCapture`: HTTP copying of resources and external scripts.
-- `WebResearchScripts`: JavaScript payload definitions.
-- `WebResearchWebViewController`: WebView clients and WebView event routing.
-- `WebNavigationController`: URL normalization and active-window navigation.
-- `WebBookmarkController`: bookmark persistence and selection.
-- `WebCookieStatsController`: cookie statistics panel lifecycle.
-- `WebResearchExportController`: ZIP document creation/export flow.
-- `ResearchArchive`: raw capture state and export generation.
-- `NetworkRecordPipeline`: raw-to-debugger routing boundary.
-- `NetworkDebugStore`: correlated debugger storage and revisions.
-- `NetworkEventCorrelator`: debugger-store correlation policy.
-- `NetworkDisplayMerger`: derived display-only merging.
-- `NetworkEndpointAnalyzer`: endpoint grouping and normalization.
-- `NetworkEventClassifier`: event classification helpers.
-- `NetworkDebuggerDataSource`: incremental debugger-store synchronization.
-- `NetworkReplayController`: replay/editor UI and request execution.
+Отвечает за:
+- release gate по `[release]`;
+- определение следующего числового тега;
+- публикацию GitHub Release;
+- проверку уже опубликованного файла по SHA-256;
+- idempotent recovery;
+- rollback незавершённого draft/tag;
+- очистку временных Actions artifacts после успешной публикации.
 
-The critical invariant after v66 is that correlation and display transformations do not replace or mutate the raw archive used for exports.
+### L2 — универсальный APK-уровень
+
+`.github/workflows/_release-apk.yml`
+
+Отвечает за:
+- режимы `release` и `validate`;
+- получение unsigned APK candidate от L3;
+- проверку package/version до подписи;
+- проверку, что candidate действительно unsigned;
+- architecture check;
+- подпись постоянным ключом;
+- проверку сертификата и финального APK;
+- retention APK-бинарников;
+- Telegram notification.
+
+### L3 — проектная сборка
+
+`.github/actions/build-apk/action.yml`
+
+Отвечает только за проектно-специфичную сборку:
+
+```text
+./gradlew :app:assembleRelease
+```
+
+Номер релиза передаётся как `RELEASE_VERSION_CODE`.
+
+## Точки входа
+
+- `.github/workflows/android-apk.yml` — релиз из `main`.
+- `.github/workflows/validate-work-branches.yml` — проверка `*-work` через тот же L2 в режиме `validate`.
+
+## Автоматическая актуализация документации
+
+После успешной публикации каждого релиза выполняется отдельный post-release job:
+
+1. получает exact release metadata и SHA-256 опубликованного APK;
+2. определяет предыдущий числовой тег;
+3. собирает commit subjects и изменённые файлы между релизами;
+4. обновляет управляемые блоки в `README.md` и `REFACTORING.md`;
+5. делает отдельный docs commit без `[release]`.
+
+Статические архитектурные разделы остаются человекочитаемыми и редактируемыми вручную; автоматически заменяются только блоки между `AUTO-RELEASE-START` и `AUTO-RELEASE-END`.
+
+## Исторический контекст
+
+До текущей структуры проект проходил серию выделений ответственности из монолитных Activity/utility-классов: capture orchestration, resource capture, JavaScript payloads, replay, correlation, navigation/bookmarks/cookies, WebView orchestration, ZIP export и raw-to-debugger pipeline были последовательно вынесены в отдельные компоненты.
+
+При последующих изменениях важнее сохранять текущие границы и инварианты, чем старую нумерацию промежуточных рефакторингов.
