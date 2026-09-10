@@ -74,15 +74,6 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         } catch (_: Exception) { emptyList() }
     }
 
-    private fun parseCookieHeader(raw: String): Map<String, String> {
-        val out = linkedMapOf<String, String>()
-        raw.split(';').map { it.trim() }.filter { it.isNotBlank() }.forEach { part ->
-            val eq = part.indexOf('=')
-            if (eq > 0) out[part.substring(0, eq).trim()] = part.substring(eq + 1)
-        }
-        return out
-    }
-
     private fun hostOf(raw: String): String = try {
         URL(raw).host.lowercase(Locale.US)
     } catch (_: Exception) { "" }
@@ -113,7 +104,7 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         val out = linkedMapOf<String, String>()
         representativeUrls(domain, page, domainEvents).forEach { url ->
             val raw = try { CookieManager.getInstance().getCookie(url).orEmpty() } catch (_: Exception) { "" }
-            parseCookieHeader(raw).forEach { (name, value) -> if (!out.containsKey(name)) out[name] = value }
+            CookieTraceSupport.parseCookieHeader(raw).forEach { (name, value) -> if (!out.containsKey(name)) out[name] = value }
         }
         return out
     }
@@ -124,47 +115,6 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         all.map { eventDomain(it) }.filter { it.isNotBlank() }.forEach { domains.add(it) }
         val current = hostOf(page)
         return domains.sortedWith(compareBy<String> { if (it == current) 0 else 1 }.thenBy { it })
-    }
-
-    private fun currentOrigin(history: List<JSONObject>, currentValue: String?): JSONObject? {
-        if (currentValue != null) {
-            history.asReversed().firstOrNull {
-                it.optString("action") != "DELETE" &&
-                    it.optString("value") == currentValue &&
-                    it.optString("confidence") != "UNKNOWN"
-            }?.let { return it }
-        }
-        return history.asReversed().firstOrNull { it.optString("action") != "DELETE" }
-    }
-
-    private fun birthEvent(history: List<JSONObject>): JSONObject? {
-        history.firstOrNull { it.optString("action") in setOf("CREATE", "SET") && it.optString("confidence") == "EXACT" }?.let { return it }
-        history.firstOrNull { it.optString("action") in setOf("CREATE", "SET", "OBSERVED") }?.let { return it }
-        return history.firstOrNull()
-    }
-
-    private fun regenerationEvent(history: List<JSONObject>, currentValue: String?): JSONObject? {
-        val current = currentOrigin(history, currentValue)
-        if (current != null && current.optString("origin") in setOf("HTTP_RESPONSE", "LIKELY_HTTP_RESPONSE", "JAVASCRIPT")) return current
-        return birthEvent(history)
-    }
-
-    private fun sourceShort(event: JSONObject?): String {
-        if (event == null) return "источник неизвестен"
-        val source = when (event.optString("origin", "")) {
-            "HTTP_RESPONSE" -> "HTTP Set-Cookie"
-            "JAVASCRIPT" -> event.optString("mechanism", "JavaScript")
-            "LIKELY_HTTP_RESPONSE" -> "вероятно HTTP"
-            else -> event.optString("mechanism", "неизвестно")
-        }
-        return "$source · ${confidenceRu(event.optString("confidence", "UNKNOWN"))}"
-    }
-
-    private fun confidenceRu(value: String) = when (value) {
-        "EXACT" -> "точно"
-        "MEDIUM" -> "вероятно"
-        "LOW" -> "предположение"
-        else -> "неизвестно"
     }
 
     private fun showDomainList(activity: NetworkDebuggerActivity) {
@@ -263,8 +213,8 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         if (active.isEmpty()) root.addView(sectionText(activity, "Активных куки нет"))
         active.toSortedMap().forEach { (name, value) ->
             val history = domainEvents.filter { it.optString("name") == name }
-            val origin = currentOrigin(history, value)
-            root.addView(cookieRow(activity, name, value, sourceShort(origin), true) {
+            val origin = CookieTraceSupport.currentOrigin(history, value)
+            root.addView(cookieRow(activity, name, value, CookieTraceSupport.sourceShort(origin), true) {
                 dialog?.dismiss()
                 showCookieDetails(activity, domain, name, value, true)
             })
@@ -275,7 +225,7 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
             inactive.forEach { name ->
                 val history = domainEvents.filter { it.optString("name") == name }
                 val latest = history.lastOrNull()
-                root.addView(cookieRow(activity, name, latest?.optString("value", "").orEmpty(), sourceShort(latest), false) {
+                root.addView(cookieRow(activity, name, latest?.optString("value", "").orEmpty(), CookieTraceSupport.sourceShort(latest), false) {
                     dialog?.dismiss()
                     showCookieDetails(activity, domain, name, null, false)
                 })
@@ -323,9 +273,9 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
 
     private fun showCookieDetails(activity: NetworkDebuggerActivity, domain: String, name: String, currentValue: String?, active: Boolean) {
         val history = eventsForDomain(domain, traceEvents()).filter { it.optString("name") == name }
-        val birth = birthEvent(history)
-        val origin = currentOrigin(history, currentValue)
-        val regen = regenerationEvent(history, currentValue)
+        val birth = CookieTraceSupport.birthEvent(history)
+        val origin = CookieTraceSupport.currentOrigin(history, currentValue)
+        val regen = CookieTraceSupport.regenerationEvent(history, currentValue)
 
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -340,11 +290,11 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         }, true))
 
         root.addView(sectionText(activity, "КАК ОНА РОДИЛАСЬ"))
-        root.addView(block(activity, if (birth == null) "Рождение не зафиксировано. Cookie могла существовать до запуска трассировки." else formatOrigin(birth), false))
+        root.addView(block(activity, if (birth == null) "Рождение не зафиксировано. Cookie могла существовать до запуска трассировки." else CookieTraceSupport.formatOrigin(birth), false))
 
         if (origin != null && origin !== birth) {
             root.addView(sectionText(activity, "ИСТОЧНИК ТЕКУЩЕГО ЗНАЧЕНИЯ"))
-            root.addView(block(activity, formatOrigin(origin), false))
+            root.addView(block(activity, CookieTraceSupport.formatOrigin(origin), false))
         }
 
         root.addView(sectionText(activity, "КАК ПОЛУЧИТЬ ЕЁ СНОВА"))
@@ -356,24 +306,24 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
                     val url = regen.optString("url", "")
                     if (url.startsWith("http://") || url.startsWith("https://")) {
                         root.addView(actionButton(activity, if (regen.optString("confidence") == "EXACT") "ПОВТОРИТЬ ИСХОДНЫЙ ЗАПРОС" else "ПОВТОРИТЬ ВЕРОЯТНЫЙ ЗАПРОС") {
-                            val headers = headersMap(regen.optJSONObject("requestHeaders"))
+                            val headers = CookieTraceSupport.headersMap(regen.optJSONObject("requestHeaders"))
                             val original = JSONObject().put("url", url).put("method", regen.optString("method", "GET"))
                             if (regen.has("_storeId")) original.put("_storeId", regen.optLong("_storeId"))
                             val ok = NetworkRequestActions.replay(activity, original, regen.optString("method", "GET"), url, headers, regen.optString("requestBody", ""))
                             Toast.makeText(activity, if (ok) "Запрос отправляется" else "Не удалось повторить запрос", Toast.LENGTH_SHORT).show()
                         })
-                        root.addView(actionButton(activity, "cURL") { copyText(activity, "cURL", curlFor(regen)) })
+                        root.addView(actionButton(activity, "cURL") { copyText(activity, "cURL", CookieTraceSupport.curlFor(regen)) })
                     }
                 }
                 "JAVASCRIPT" -> {
-                    if (regen.optString("raw", "").isNotBlank()) root.addView(actionButton(activity, "JS SETTER") { copyText(activity, "JS setter", jsSetter(regen)) })
+                    if (regen.optString("raw", "").isNotBlank()) root.addView(actionButton(activity, "JS SETTER") { copyText(activity, "JS setter", CookieTraceSupport.jsSetter(regen)) })
                 }
             }
         }
 
         root.addView(sectionText(activity, "ИСТОРИЯ"))
         if (history.isEmpty()) root.addView(block(activity, "История пока отсутствует.", false))
-        history.asReversed().forEach { root.addView(block(activity, formatHistory(it), false)) }
+        history.asReversed().forEach { root.addView(block(activity, CookieTraceSupport.formatHistory(it), false)) }
 
         val scroll = ScrollView(activity).apply { setBackgroundColor(ink); addView(root) }
         val dialog = AlertDialog.Builder(activity).setTitle("COOKIE · $name").setView(scroll).setNegativeButton("Назад", null).create()
@@ -388,101 +338,28 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         dialog.show()
     }
 
-    private fun formatOrigin(event: JSONObject): String = buildString {
-        val time = event.optLong("time", 0L)
-        if (time > 0L) append("Время: ").append(timeText(time)).append('\n')
-        append("Механизм: ").append(event.optString("mechanism", "—")).append('\n')
-        append("Точность: ").append(confidenceRu(event.optString("confidence", "UNKNOWN"))).append('\n')
-        val url = event.optString("url", "")
-        if (url.isNotBlank()) {
-            append("Запрос: ").append(event.optString("method", "GET"))
-            val status = event.optInt("status", 0)
-            if (status > 0) append("  ").append(status)
-            append('\n').append(url).append('\n')
-        } else event.optString("page", "").takeIf { it.isNotBlank() }?.let { append("Страница: ").append(it).append('\n') }
-        event.optString("raw", "").takeIf { it.isNotBlank() }?.let { append("Set/Raw: ").append(it).append('\n') }
-        event.optString("stack", "").takeIf { it.isNotBlank() }?.let { append("JS stack:\n").append(it.take(3000)).append('\n') }
-        if (event.has("deltaMs")) append("Cookie изменилась через ").append(event.optLong("deltaMs")).append(" мс после этого запроса\n")
-    }.trimEnd()
-
     private fun regenerationRecipe(event: JSONObject?): String {
         if (event == null) return "Недостаточно данных, чтобы предложить способ воспроизведения. Нужно поймать момент создания cookie после запуска приложения."
         return when (event.optString("origin", "")) {
             "HTTP_RESPONSE" -> buildString {
                 append("Cookie пришла в ответе Set-Cookie. Чтобы сервер сгенерировал её снова, повторите исходный HTTP-запрос.\n\n")
-                append(requestRecipe(event))
+                append(CookieTraceSupport.requestRecipe(event))
                 append("\n\nНиже есть кнопка повторения запроса. Новый ответ может выдать новое значение cookie, если серверная логика допускает повторную генерацию.")
             }
             "LIKELY_HTTP_RESPONSE" -> buildString {
                 append("Cookie появилась сразу после этого запроса, но Set-Cookie в исходном ответе перехватить не удалось. Поэтому источник вероятный, а не доказанный.\n\n")
-                append(requestRecipe(event))
+                append(CookieTraceSupport.requestRecipe(event))
                 append("\n\nМожно повторить этот запрос и проверить, создастся ли cookie снова.")
             }
             "JAVASCRIPT" -> buildString {
                 append("Cookie записана JavaScript через ").append(event.optString("mechanism", "JavaScript")).append(".\n")
                 if (event.optString("stack", "").isNotBlank()) append("Главный ориентир — JS stack ниже: он показывает код, который выполнил запись.\n")
                 append("\nДля генерации нового значения нужно повторить действие сайта, приведшее к этому вызову. Простое выполнение setter-а обычно только запишет уже известное значение.\n\n")
-                append("Setter для проверки:\n").append(jsSetter(event))
+                append("Setter для проверки:\n").append(CookieTraceSupport.jsSetter(event))
             }
             else -> "Источник рождения пока не доказан. Трассировка видит факт появления/изменения cookie, но не может гарантированно назвать код или HTTP-ответ, создавший её."
         }
     }
-
-    private fun requestRecipe(event: JSONObject): String = buildString {
-        append(event.optString("method", "GET")).append(' ').append(event.optString("url", "—"))
-        val headers = event.optJSONObject("requestHeaders")
-        if (headers != null && headers.length() > 0) {
-            append("\n\nHEADERS\n")
-            val keys = headers.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                append(key).append(": ").append(headers.opt(key)).append('\n')
-            }
-        }
-        val body = event.optString("requestBody", "")
-        if (body.isNotBlank()) append("\nBODY\n").append(body)
-    }.trimEnd()
-
-    private fun formatHistory(event: JSONObject): String = buildString {
-        append(timeText(event.optLong("time", 0L))).append("  ").append(event.optString("action", "EVENT")).append('\n')
-        append(sourceShort(event)).append('\n')
-        val url = event.optString("url", "")
-        if (url.isNotBlank()) append(event.optString("method", "GET")).append(' ').append(url).append('\n')
-        if (event.has("deltaMs")) append("Δ ").append(event.optLong("deltaMs")).append(" ms\n")
-        val raw = event.optString("raw", "")
-        if (raw.isNotBlank()) append(raw)
-    }.trimEnd()
-
-    private fun jsSetter(event: JSONObject): String {
-        val raw = event.optString("raw", "")
-        return if (event.optString("mechanism", "").startsWith("CookieStore")) {
-            "// исходная запись была через ${event.optString("mechanism")}\n// raw: $raw"
-        } else "document.cookie = ${jsQuote(raw)};"
-    }
-
-    private fun jsQuote(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
-
-    private fun headersMap(obj: JSONObject?): Map<String, String> {
-        if (obj == null) return emptyMap()
-        val out = linkedMapOf<String, String>()
-        val keys = obj.keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            out[key] = obj.opt(key)?.toString().orEmpty()
-        }
-        return out
-    }
-
-    private fun curlFor(event: JSONObject): String = buildString {
-        val method = event.optString("method", "GET")
-        val url = event.optString("url", "")
-        append("curl -X ").append(shellQuote(method)).append(' ').append(shellQuote(url))
-        headersMap(event.optJSONObject("requestHeaders")).forEach { (name, value) -> append(" \\\n  -H ").append(shellQuote("$name: $value")) }
-        val body = event.optString("requestBody", "")
-        if (body.isNotBlank()) append(" \\\n  --data-raw ").append(shellQuote(body))
-    }
-
-    private fun shellQuote(value: String) = "'" + value.replace("'", "'\"'\"'") + "'"
 
     private fun copyText(activity: Activity, label: String, value: String) {
         ResultDelivery.deliverText(activity, label, value)
@@ -521,8 +398,6 @@ class CookieTraceUiProvider : ContentProvider(), Application.ActivityLifecycleCa
         background = round(activity, surface, 9, line)
         setOnClickListener { click() }
     }
-
-    private fun timeText(ms: Long): String = if (ms > 0L) SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(ms)) else "—"
 
     private fun rewireCookieButton(activity: NetworkDebuggerActivity) {
         val root = (activity.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0) as? LinearLayout) ?: return
