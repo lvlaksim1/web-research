@@ -83,19 +83,20 @@ jobs:
           echo "apk_filename=${REPO_NAME}-v${RELEASE_NUMBER}.apk" >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact source commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up Java 17
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
 
       - name: Install universal APK tools
         shell: bash
@@ -197,9 +198,43 @@ jobs:
           "$APKSIGNER" sign --key "$SIGN_DIR/key.pk8" --cert "$SIGN_DIR/cert.pem" --out "$RELEASE_APK_FILENAME" "$CANDIDATE_APK"
           "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK_FILENAME"
 
+      - name: Write APK verification summary
+        env:
+          MODE: ${{ inputs.mode }}
+          RELEASE_NUMBER: ${{ steps.metadata.outputs.release_number }}
+          RELEASE_APK_FILENAME: ${{ steps.metadata.outputs.apk_filename }}
+          CANDIDATE_APK: ${{ steps.project-build.outputs.apk_path }}
+          EXPECTED_PACKAGE_ID: ${{ inputs.expected_package_id }}
+          EXPECTED_CERT_SHA256: ${{ inputs.expected_cert_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ABIS=$(unzip -Z1 "$CANDIDATE_APK" | awk -F/ '$1 == "lib" && NF >= 3 {print $2}' | sort -u | paste -sd ',' -)
+          if [ -z "$ABIS" ]; then
+            ABIS="architecture-independent"
+          fi
+          APK_SHA256=$(sha256sum "$RELEASE_APK_FILENAME" | awk '{print $1}')
+
+          {
+            echo "## APK verification"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Mode | `$MODE` |"
+            echo "| Commit | `$GITHUB_SHA` |"
+            echo "| Package | `$EXPECTED_PACKAGE_ID` |"
+            echo "| versionCode | `$RELEASE_NUMBER` |"
+            echo "| versionName | `v$RELEASE_NUMBER` |"
+            echo "| Native ABI | `$ABIS` |"
+            echo "| Signing certificate SHA-256 | `$EXPECTED_CERT_SHA256` |"
+            echo "| Signed APK | `$RELEASE_APK_FILENAME` |"
+            echo "| Signed APK SHA-256 | `$APK_SHA256` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload release APK artifact
         if: ${{ inputs.mode == 'release' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-artifact
           path: ${{ steps.metadata.outputs.apk_filename }}
@@ -208,7 +243,7 @@ jobs:
 
       - name: Upload validation APK artifact
         if: ${{ inputs.mode == 'validate' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: work-branch-signed-apk
           path: ${{ steps.metadata.outputs.apk_filename }}
@@ -289,6 +324,8 @@ jobs:
 
   telegram:
     if: ${{ inputs.mode == 'release' }}
+    outputs:
+      notification_status: ${{ steps.notify.outputs.status }}
     needs:
       - build-sign-verify
       - publish
@@ -297,6 +334,7 @@ jobs:
     permissions: {}
     steps:
       - name: Send APK link to Telegram
+        id: notify
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -308,6 +346,7 @@ jobs:
           set -u
 
           if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "status=not-configured" >> "$GITHUB_OUTPUT"
             echo "::warning::GitHub Release published, but Telegram secrets are not configured"
             exit 0
           fi
@@ -330,6 +369,51 @@ jobs:
             fi
           done
 
-          if [ "$SUCCESS" != "true" ]; then
+          if [ "$SUCCESS" = "true" ]; then
+            echo "status=sent" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failed" >> "$GITHUB_OUTPUT"
             echo "::warning::GitHub Release published successfully, but Telegram notification failed after 3 attempts"
           fi
+
+  release-summary:
+    if: ${{ always() && inputs.mode == 'release' && needs.build-sign-verify.result != 'skipped' }}
+    needs:
+      - build-sign-verify
+      - publish
+      - retain-apk-history
+      - telegram
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Write APK release run summary
+        env:
+          RELEASE_NUMBER: ${{ needs.build-sign-verify.outputs.effective_release_number }}
+          APK_FILENAME: ${{ needs.build-sign-verify.outputs.apk_filename }}
+          BUILD_RESULT: ${{ needs.build-sign-verify.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+          RETENTION_RESULT: ${{ needs.retain-apk-history.result }}
+          TELEGRAM_JOB_RESULT: ${{ needs.telegram.result }}
+          TELEGRAM_STATUS: ${{ needs.telegram.outputs.notification_status }}
+        shell: bash
+        run: |
+          RELEASE_TAG="v${RELEASE_NUMBER}"
+          RELEASE_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+          APK_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$APK_FILENAME"
+
+          {
+            echo "## APK release pipeline"
+            echo
+            echo "| Stage | Result |"
+            echo "|---|---|"
+            echo "| Build / verify / sign | `$BUILD_RESULT` |"
+            echo "| GitHub Release | `$PUBLISH_RESULT` |"
+            echo "| APK retention | `$RETENTION_RESULT` |"
+            echo "| Telegram job | `$TELEGRAM_JOB_RESULT` |"
+            echo "| Telegram delivery | `${TELEGRAM_STATUS:-unknown}` |"
+            echo
+            echo "**Release:** [$RELEASE_TAG]($RELEASE_URL)"
+            echo
+            echo "**APK:** [$APK_FILENAME]($APK_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"
