@@ -56,5 +56,6 @@ jobs:
           python3 .github/scripts/update-release-docs.py --release-tag "$RELEASE_TAG" --release-commit "$RELEASE_COMMIT" --artifact-filename "$APK_FILENAME" --sha256 "$APK_SHA256" --published-at "$PUBLISHED_AT" --package-id "web.research" --version-code "$RELEASE_NUMBER" --version-name "$RELEASE_TAG"
 
           git diff --check
-          git diff --exit-code -- README.md ARCHITECTURE.md CHANGELOG.md RELEASE.md .release/latest.json
-
+          test -f REFACTORING.md
+          grep -F "Актуально для релиза: **$RELEASE_TAG**" REFACTORING.md
+          git diff --exit-code -- README.md ARCHITECTURE.md CHANGELOG.md RELEASE.md REFACTORING.md .release/latest.json

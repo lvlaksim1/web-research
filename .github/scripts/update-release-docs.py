@@ -14,12 +14,14 @@ GENERATED_DOCS = {
     "ARCHITECTURE.md",
     "CHANGELOG.md",
     "RELEASE.md",
-    ".release/latest.json",
     "REFACTORING.md",
+    ".release/latest.json",
 }
+
 
 def run(*args: str) -> str:
     return subprocess.check_output(args, text=True).strip()
+
 
 def replace_block(path: Path, body: str) -> None:
     text = path.read_text(encoding="utf-8")
@@ -33,6 +35,18 @@ def replace_block(path: Path, body: str) -> None:
         lines[insert_at:insert_at] = ["", block, ""]
         text = "\n".join(lines).rstrip() + "\n"
     path.write_text(text, encoding="utf-8")
+
+
+def ensure_refactoring_document(path: Path) -> None:
+    if path.exists():
+        return
+    path.write_text(
+        "# Рефакторинг web research\n\n"
+        "Автоматическая контрольная точка текущего состояния рефакторинга. "
+        "Детальные архитектурные инварианты описаны в `ARCHITECTURE.md`.\n",
+        encoding="utf-8",
+    )
+
 
 def upsert_changelog(path: Path, tag: str, body: str) -> None:
     text = path.read_text(encoding="utf-8")
@@ -48,6 +62,7 @@ def upsert_changelog(path: Path, tag: str, body: str) -> None:
         text = text.replace(CHANGELOG_INSERT, f"{CHANGELOG_INSERT}\n{section}", 1)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
 
+
 def numeric_tags() -> list[tuple[int, str]]:
     tags = []
     for tag in run("git", "tag", "--list", "v[0-9]*").splitlines():
@@ -56,9 +71,11 @@ def numeric_tags() -> list[tuple[int, str]]:
             tags.append((int(match.group(1)), tag.strip()))
     return sorted(tags)
 
+
 def previous_tag(current_number: int) -> str:
     candidates = [tag for number, tag in numeric_tags() if number < current_number]
     return candidates[-1] if candidates else ""
+
 
 def release_changes(previous: str, commit: str) -> tuple[list[str], list[str]]:
     commit_range = f"{previous}..{commit}" if previous else commit
@@ -74,12 +91,14 @@ def release_changes(previous: str, commit: str) -> tuple[list[str], list[str]]:
     files = [f for f in files if f and f not in GENERATED_DOCS]
     return subjects, sorted(dict.fromkeys(files))
 
+
 def bullet_lines(items: list[str], empty: str, code: bool = False) -> str:
     if not items:
         return f"- {empty}"
     if code:
         return "\n".join(f"- `{item}`" for item in items)
     return "\n".join(f"- {item}" for item in items)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -155,6 +174,20 @@ def main() -> None:
 - SHA-256: `{args.sha256}`
 - Опубликован: `{published}`"""
 
+    refactoring_block = f"""## Контрольная точка рефакторинга
+
+- Актуально для релиза: **{args.release_tag}**
+- Релизный commit: `{args.release_commit}`
+- Опубликован: `{published}`
+
+### Изменения между релизами
+
+{bullet_lines(subjects, "Отдельных изменений между релизами не зафиксировано.")}
+
+### Изменённые файлы
+
+{bullet_lines(changed_files, "Нет файловых изменений.", code=True)}"""
+
     changelog_block = f"""## {args.release_tag} — {published}
 
 - Release commit: `{args.release_commit}`
@@ -188,14 +221,18 @@ def main() -> None:
         "changedFiles": changed_files,
     }
 
+    refactoring_path = root / "REFACTORING.md"
+    ensure_refactoring_document(refactoring_path)
     replace_block(root / "README.md", "\n".join(readme_lines))
     replace_block(root / "ARCHITECTURE.md", architecture_block)
     replace_block(root / "RELEASE.md", release_block)
+    replace_block(refactoring_path, refactoring_block)
     upsert_changelog(root / "CHANGELOG.md", args.release_tag, changelog_block)
 
     manifest_path = root / ".release" / "latest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()
