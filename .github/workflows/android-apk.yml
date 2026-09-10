@@ -84,10 +84,13 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force
-          python3 .github/scripts/update-release-docs.py             --release-tag "$RELEASE_TAG"             --release-commit "$GITHUB_SHA"             --artifact-filename "$APK_FILENAME"             --sha256 "$APK_SHA256"             --published-at "$PUBLISHED_AT"
+          python3 .github/scripts/update-release-docs.py --release-tag "$RELEASE_TAG" --release-commit "$GITHUB_SHA" --artifact-filename "$APK_FILENAME" --sha256 "$APK_SHA256" --published-at "$PUBLISHED_AT" --package-id "web.research" --version-code "$RELEASE_NUMBER" --version-name "$RELEASE_TAG"
           git diff --check
           grep -F "Версия: **$RELEASE_TAG**" README.md
-          grep -F "Состояние на $RELEASE_TAG" REFACTORING.md
+          grep -F "Актуально для релиза: **$RELEASE_TAG**" ARCHITECTURE.md
+          grep -F "Релиз: **$RELEASE_TAG**" RELEASE.md
+          grep -F "## $RELEASE_TAG —" CHANGELOG.md
+          jq -e --arg tag "$RELEASE_TAG" '.tag == $tag and .schemaVersion == 1' .release/latest.json >/dev/null
 
       - name: Commit updated documentation
         env:
@@ -95,14 +98,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- README.md REFACTORING.md; then
+          if git diff --quiet -- README.md ARCHITECTURE.md CHANGELOG.md RELEASE.md .release/latest.json; then
             echo "Release documentation is already current"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md REFACTORING.md
+          git add README.md ARCHITECTURE.md CHANGELOG.md RELEASE.md .release/latest.json
           git commit -m "docs: update release documentation for ${RELEASE_TAG}"
 
           for ATTEMPT in 1 2 3; do

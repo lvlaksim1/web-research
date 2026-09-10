@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -7,6 +8,15 @@ from pathlib import Path
 
 START = "<!-- AUTO-RELEASE-START -->"
 END = "<!-- AUTO-RELEASE-END -->"
+CHANGELOG_INSERT = "<!-- AUTO-CHANGELOG-INSERT -->"
+GENERATED_DOCS = {
+    "README.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "RELEASE.md",
+    ".release/latest.json",
+    "REFACTORING.md",
+}
 
 def run(*args: str) -> str:
     return subprocess.check_output(args, text=True).strip()
@@ -23,6 +33,20 @@ def replace_block(path: Path, body: str) -> None:
         lines[insert_at:insert_at] = ["", block, ""]
         text = "\n".join(lines).rstrip() + "\n"
     path.write_text(text, encoding="utf-8")
+
+def upsert_changelog(path: Path, tag: str, body: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    start = f"<!-- AUTO-CHANGELOG-{tag}-START -->"
+    end = f"<!-- AUTO-CHANGELOG-{tag}-END -->"
+    section = f"{start}\n{body.rstrip()}\n{end}"
+    if start in text and end in text:
+        pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.S)
+        text = pattern.sub(section, text, count=1)
+    else:
+        if CHANGELOG_INSERT not in text:
+            raise SystemExit("CHANGELOG.md does not contain AUTO-CHANGELOG-INSERT")
+        text = text.replace(CHANGELOG_INSERT, f"{CHANGELOG_INSERT}\n{section}", 1)
+    path.write_text(text.rstrip() + "\n", encoding="utf-8")
 
 def numeric_tags() -> list[tuple[int, str]]:
     tags = []
@@ -47,23 +71,15 @@ def release_changes(previous: str, commit: str) -> tuple[list[str], list[str]]:
         files = run("git", "diff", "--name-only", previous, commit).splitlines()
     else:
         files = run("git", "show", "--pretty=", "--name-only", commit).splitlines()
-    files = [f for f in files if f and f not in {"README.md", "REFACTORING.md"}]
+    files = [f for f in files if f and f not in GENERATED_DOCS]
     return subjects, sorted(dict.fromkeys(files))
 
-def application_id(root: Path) -> str:
-    gradle = (root / "app" / "build.gradle.kts").read_text(encoding="utf-8")
-    match = re.search(r'applicationId\s*=\s*"([^"]+)"', gradle)
-    return match.group(1) if match else "unknown"
-
-def subject_bullets(items: list[str], empty: str) -> str:
+def bullet_lines(items: list[str], empty: str, code: bool = False) -> str:
     if not items:
         return f"- {empty}"
+    if code:
+        return "\n".join(f"- `{item}`" for item in items)
     return "\n".join(f"- {item}" for item in items)
-
-def file_bullets(items: list[str], empty: str) -> str:
-    if not items:
-        return f"- {empty}"
-    return "\n".join(f"- `{item}`" for item in items)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -72,64 +88,114 @@ def main() -> None:
     parser.add_argument("--artifact-filename", required=True)
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--published-at", default="")
+    parser.add_argument("--package-id", default="")
+    parser.add_argument("--version-code", default="")
+    parser.add_argument("--version-name", default="")
     args = parser.parse_args()
 
     match = re.fullmatch(r"v([0-9]+)", args.release_tag)
     if not match:
         raise SystemExit(f"Invalid release tag: {args.release_tag}")
-    number = int(match.group(1))
+    release_number = int(match.group(1))
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", args.release_commit):
+        raise SystemExit("Invalid release commit")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.sha256):
         raise SystemExit("Invalid SHA-256")
 
+    version_code = None
+    if args.version_code:
+        if not re.fullmatch(r"[0-9]+", args.version_code):
+            raise SystemExit("Invalid versionCode")
+        version_code = int(args.version_code)
+    version_name = args.version_name or None
+    package_id = args.package_id or None
+
     root = Path(__file__).resolve().parents[2]
-    previous = previous_tag(number)
-    subjects, files = release_changes(previous, args.release_commit)
-    package_id = application_id(root)
+    previous = previous_tag(release_number)
+    subjects, changed_files = release_changes(previous, args.release_commit)
     repo = os.environ.get("GITHUB_REPOSITORY", "lvlaksim1/web-research")
-    release_url = f"https://github.com/{repo}/releases/tag/{args.release_tag}"
-    apk_url = f"https://github.com/{repo}/releases/download/{args.release_tag}/{args.artifact_filename}"
+    server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    release_url = f"{server}/{repo}/releases/tag/{args.release_tag}"
+    artifact_url = f"{server}/{repo}/releases/download/{args.release_tag}/{args.artifact_filename}"
     previous_text = previous or "—"
     published = args.published_at or "—"
 
-    readme_block = f"""## Текущий релиз
+    readme_lines = [
+        "## Текущий релиз",
+        "",
+        f"- Версия: **{args.release_tag}**",
+    ]
+    if version_code is not None:
+        readme_lines.append(f"- `versionCode`: **{version_code}**")
+    if version_name is not None:
+        readme_lines.append(f"- `versionName`: **{version_name}**")
+    if package_id is not None:
+        readme_lines.append(f"- package: `{package_id}`")
+    readme_lines.extend([
+        f"- commit: `{args.release_commit}`",
+        f"- APK: `{args.artifact_filename}`",
+        f"- SHA-256: `{args.sha256}`",
+        f"- Опубликован: `{published}`",
+        f"- Предыдущий релиз: **{previous_text}**",
+        f"- Release: {release_url}",
+        f"- APK: {artifact_url}",
+    ])
 
-- Версия: **{args.release_tag}**
-- `versionCode`: **{number}**
-- `versionName`: **{args.release_tag}**
-- package: `{package_id}`
-- commit: `{args.release_commit}`
-- APK: `{args.artifact_filename}`
-- SHA-256: `{args.sha256}`
-- Опубликован: `{published}`
-- Предыдущий релиз: **{previous_text}**
-- Release: {release_url}
-- APK: {apk_url}
+    architecture_block = f"""## Контрольная точка документа
 
-### Изменения относительно {previous_text}
-
-{subject_bullets(subjects, "Отдельных изменений между релизами не зафиксировано.")}
-
-### Изменённые файлы
-
-{file_bullets(files, "Нет файловых изменений.")}"""
-
-    refactoring_block = f"""## Состояние на {args.release_tag}
-
+- Актуально для релиза: **{args.release_tag}**
 - Релизный commit: `{args.release_commit}`
-- Предыдущая контрольная точка: **{previous_text}**
-- APK: `{args.artifact_filename}`
+- Опубликован: `{published}`"""
+
+    release_block = f"""## Последний проверенный релиз
+
+- Релиз: **{args.release_tag}**
+- Релизный commit: `{args.release_commit}`
+- Артефакт: `{args.artifact_filename}`
 - SHA-256: `{args.sha256}`
+- Опубликован: `{published}`"""
 
-### Изменения между {previous_text} и {args.release_tag}
+    changelog_block = f"""## {args.release_tag} — {published}
 
-{subject_bullets(subjects, "Отдельных изменений между релизами не зафиксировано.")}
+- Release commit: `{args.release_commit}`
+- Artifact: `{args.artifact_filename}`
+- SHA-256: `{args.sha256}`
+- Previous release: **{previous_text}**
 
-### Затронутые файлы
+### Changes
 
-{file_bullets(files, "Нет файловых изменений.")}"""
+{bullet_lines(subjects, "Отдельных изменений между релизами не зафиксировано.")}
 
-    replace_block(root / "README.md", readme_block)
-    replace_block(root / "REFACTORING.md", refactoring_block)
+### Changed files
+
+{bullet_lines(changed_files, "Нет файловых изменений.", code=True)}"""
+
+    manifest = {
+        "schemaVersion": 1,
+        "releaseNumber": release_number,
+        "tag": args.release_tag,
+        "versionCode": version_code,
+        "versionName": version_name,
+        "packageId": package_id,
+        "commit": args.release_commit,
+        "artifact": args.artifact_filename,
+        "sha256": args.sha256.lower(),
+        "publishedAt": args.published_at or None,
+        "previousRelease": previous or None,
+        "releaseUrl": release_url,
+        "artifactUrl": artifact_url,
+        "commits": subjects,
+        "changedFiles": changed_files,
+    }
+
+    replace_block(root / "README.md", "\n".join(readme_lines))
+    replace_block(root / "ARCHITECTURE.md", architecture_block)
+    replace_block(root / "RELEASE.md", release_block)
+    upsert_changelog(root / "CHANGELOG.md", args.release_tag, changelog_block)
+
+    manifest_path = root / ".release" / "latest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 if __name__ == "__main__":
     main()

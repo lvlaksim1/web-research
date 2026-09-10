@@ -16,22 +16,6 @@ Android WebView-инструмент для максимально полног�
 - Предыдущий релиз: **v11**
 - Release: https://github.com/lvlaksim1/web-research/releases/tag/v12
 - APK: https://github.com/lvlaksim1/web-research/releases/download/v12/web-research-v12.apk
-
-### Изменения относительно v11
-
-- docs: automate release documentation updates
-- ci: refresh and maintain release workflow dependencies
-- ci: accept maintained release workflow dependencies [release]
-
-### Изменённые файлы
-
-- `.github/actions/build-apk/action.yml`
-- `.github/dependabot.yml`
-- `.github/scripts/update-release-docs.py`
-- `.github/workflows/_release-apk.yml`
-- `.github/workflows/_release-core.yml`
-- `.github/workflows/android-apk.yml`
-- `.github/workflows/validate-work-branches.yml`
 <!-- AUTO-RELEASE-END -->
 
 ## Назначение
@@ -88,15 +72,11 @@ Android WebView-инструмент для максимально полног�
 - номер релиза одновременно используется как `versionCode`; `versionName = v<versionCode>`
 - APK подписываются постоянной signing identity из GitHub Secret `ANDROID_KEYSTORE`
 
-## Архитектура релиза
+## Стандартная документация
 
-Релизный процесс разделён на три последовательных уровня:
+- `ARCHITECTURE.md` — текущая архитектура приложения, границы компонентов и инварианты.
+- `CHANGELOG.md` — накопительная история релизов.
+- `RELEASE.md` — правила сборки, проверки, публикации и сопровождения релизов.
+- `.release/latest.json` — канонические машиночитаемые metadata последнего опубликованного релиза.
 
-1. `.github/workflows/_release-core.yml` — L1: release gate, номер версии, публикация, recovery/rollback и проверка опубликованного артефакта.
-2. `.github/workflows/_release-apk.yml` — L2: APK-специфика, проверка unsigned candidate, architecture check, подпись, verification, retention и Telegram.
-3. `.github/actions/build-apk/action.yml` — L3: проектная сборка `./gradlew :app:assembleRelease`.
-
-`.github/workflows/android-apk.yml` — точка входа релиза из `main`.  
-`.github/workflows/validate-work-branches.yml` — контрольная сборка веток `*-work` через тот же L2 в режиме `validate`.
-
-После каждого успешного нового релиза `README.md` и `REFACTORING.md` автоматически получают актуальные release metadata, список commit-сообщений и список изменённых файлов относительно предыдущего релиза.
+После каждого успешного релиза workflow обновляет только стандартизированные автоматически управляемые части этих документов и делает отдельный docs commit без `[release]`.

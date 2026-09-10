@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "releaseNumber": 12,
+  "tag": "v12",
+  "versionCode": 12,
+  "versionName": "v12",
+  "packageId": "web.research",
+  "commit": "05fb86c6dca3abe1d895cf9c53da11bc7c1aa4af",
+  "artifact": "web-research-v12.apk",
+  "sha256": "f755ab9c749525951635744d8a8a10ed260f83baf89297a076c34a39ac327ffb",
+  "publishedAt": "2026-09-10T00:39:13Z",
+  "previousRelease": "v11",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v12",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v12/web-research-v12.apk",
+  "commits": [
+    "docs: automate release documentation updates",
+    "ci: refresh and maintain release workflow dependencies",
+    "ci: accept maintained release workflow dependencies [release]"
+  ],
+  "changedFiles": [
+    ".github/actions/build-apk/action.yml",
+    ".github/dependabot.yml",
+    ".github/scripts/update-release-docs.py",
+    ".github/workflows/_release-apk.yml",
+    ".github/workflows/_release-core.yml",
+    ".github/workflows/android-apk.yml",
+    ".github/workflows/validate-work-branches.yml"
+  ]
+}
