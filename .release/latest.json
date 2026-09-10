@@ -1,25 +1,23 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 19,
-  "tag": "v19",
-  "versionCode": 19,
-  "versionName": "v19",
+  "releaseNumber": 20,
+  "tag": "v20",
+  "versionCode": 20,
+  "versionName": "v20",
   "packageId": "web.research",
-  "commit": "446e068856bc05d77514f543938075b54e5f2a8b",
-  "artifact": "web-research-v19.apk",
-  "sha256": "0c33b9ed2276c560d5b3d4236ea4db3562e0e093979308dc45567c816a8651f9",
-  "publishedAt": "2026-09-10T03:00:14Z",
-  "previousRelease": "v18",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v19",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v19/web-research-v19.apk",
+  "commit": "217bd4a82c3b037ac7e4b3b63d34927e6776d4bb",
+  "artifact": "web-research-v20.apk",
+  "sha256": "702351872d53663fbbc047bc3b0b14e582813c8992f8039a7af36dcce1248c4b",
+  "publishedAt": "2026-09-10T03:06:56Z",
+  "previousRelease": "v19",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v20",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v20/web-research-v20.apk",
   "commits": [
-    "refactor: extract debugger details controller",
-    "refactor: extract realtime session dialog",
-    "release: publish debugger details and realtime refactor [release]"
+    "refactor: extract debugger controls and filters",
+    "release: publish debugger controls refactor [release]"
   ],
   "changedFiles": [
     "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerDetailsController.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerRealtimeController.kt"
+    "app/src/main/java/ru/evrasia/research/NetworkDebuggerControlsController.kt"
   ]
 }
