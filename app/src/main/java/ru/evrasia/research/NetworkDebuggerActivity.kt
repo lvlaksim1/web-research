@@ -25,7 +25,6 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.webkit.CookieManager
 import android.widget.ArrayAdapter
-import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.HorizontalScrollView
@@ -48,7 +47,6 @@ import org.json.JSONObject
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.LinkedHashMap
 import java.util.Locale
 
 class NetworkDebuggerActivity : AppCompatActivity() {
@@ -65,10 +63,9 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     private val violet get() = WebUiTheme.palette(this).blue
 
     private lateinit var list: ListView
-    private lateinit var adapter: EventAdapter
+    private lateinit var adapter: NetworkDebuggerEventAdapter
     private lateinit var counter: TextView
     private lateinit var recordButton: Button
-    private lateinit var mergeButton: Button
     private lateinit var domainSpinner: Spinner
     private lateinit var typeSpinner: Spinner
     private lateinit var methodSpinner: Spinner
@@ -149,7 +146,7 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             setPadding(dp(4), dp(4), dp(4), dp(4))
             clipToPadding = false
         }
-        adapter = EventAdapter()
+        adapter = NetworkDebuggerEventAdapter(this, items, changedIds) { mergeMode }
         list.adapter = adapter
         list.setOnItemClickListener { _, _, position, _ ->
             val event = items[position]
@@ -298,7 +295,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         content.addView(popupHeader("Фильтры и режимы") { popup?.dismiss() })
         content.addView(popupRow(if (mergeMode) "Объединено ✓" else "Раздельно", mergeMode) {
             mergeMode = !mergeMode
-            updateMergeButton()
             applyFilters()
             popup?.dismiss()
         })
@@ -420,7 +416,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         applyFilters()
     }
 
-    private fun fallbackId(event:JSONObject):Long = event.optLong("time",0L) xor event.toString().hashCode().toLong()
 
     private fun updateRecordButton(){
         if(::recordButton.isInitialized){
@@ -430,12 +425,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateMergeButton(){
-        if(::mergeButton.isInitialized){
-            mergeButton.text=if(mergeMode)"Объединено ✓" else "Раздельно"
-            mergeButton.setTextColor(if(mergeMode)accent else textColor)
-        }
-    }
 
 
     private fun selected(spinner:Spinner, fallback:String):String =
@@ -499,9 +488,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
         counter.text=projection.counterText
     }
 
-    private fun eventSources(event:JSONObject) = NetworkEventClassifier.eventSources(event)
-    private fun sourceSummary(event:JSONObject):String = NetworkDisplayMerger.sourceSummary(event,mergeMode)
-
     private fun isRealtimeSession(event:JSONObject) = NetworkEventClassifier.isRealtimeSession(event)
 
     private fun responseKind(event:JSONObject):String = NetworkEventClassifier.responseKind(event)
@@ -512,39 +498,7 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private fun responseBodyText(event:JSONObject):String = NetworkEventClassifier.responseBodyText(event)
 
-    private fun hasRequestBody(event:JSONObject):Boolean = NetworkEventClassifier.hasRequestBody(event)
-
-    private fun isCached(event:JSONObject):Boolean{
-        val cache=event.optString("cache","")
-        if(cache.isNotBlank()&&!cache.equals("network",true))return true
-        return event.has("transferSize")&&event.optLong("transferSize",-1L)==0L&&event.optLong("decodedBodySize",0L)>0L
-    }
-
-    private fun isRedirect(event:JSONObject):Boolean=event.optBoolean("redirected",false)||event.optString("redirectURL","").isNotBlank()||event.optInt("status",0) in 300..399
-
-    private fun hasAuth(event:JSONObject):Boolean{
-        val headers=event.optJSONObject("requestHeaders")?:event.optJSONObject("headers")?:return false
-        return NetworkDebuggerText.headerValue(headers,"Authorization").isNotBlank()||NetworkDebuggerText.headerValue(headers,"Proxy-Authorization").isNotBlank()
-    }
-
-    private fun rowFlags(event:JSONObject):String=buildList{
-        if(isRealtimeSession(event))return@buildList
-        if(eventSources(event).size>1)add(if(event.optString("_mergeConfidence")=="MEDIUM")"~MERGE" else "✓MERGE")
-        if(hasRequestBody(event))add("BODY")
-        if(isCached(event))add("CACHE")
-        if(isRedirect(event))add("REDIRECT")
-        if(hasAuth(event))add("AUTH")
-        if(changedIds.contains(NetworkDebuggerProjection.identity(event)))add("CHANGED")
-        if(event.optString("source","")=="replay")add("REPLAY")
-    }.joinToString("  ")
-
-    private fun isPlainRequestEvent(event:JSONObject):Boolean = NetworkEventClassifier.isPlainRequestEvent(event)
-
-    private fun isRequestEvent(event:JSONObject):Boolean = NetworkEventClassifier.isRequestEvent(event)
-
     private fun isActionEvent(event:JSONObject):Boolean = NetworkEventClassifier.isActionEvent(event)
-
-    private fun isJsEvent(event:JSONObject):Boolean = NetworkEventClassifier.isJsEvent(event)
 
     private fun hostOf(url:String):String? = NetworkEventClassifier.hostOf(url)
 
@@ -613,10 +567,10 @@ class NetworkDebuggerActivity : AppCompatActivity() {
             text=buildString{append(methodOf(event));if(status>0)append("  ").append(status);if(event.has("duration"))append("  ").append(NetworkDebuggerText.formatDuration(event.optDouble("duration",0.0)));if(event.has("responseSize"))append("  ").append(NetworkDebuggerText.formatBytes(event.optLong("responseSize")))}
             setTextColor(if(status>=400||event.has("error"))bad else accent);textSize=14f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD)
         },LinearLayout.LayoutParams(0,-2,1f))
-        titleRow.addView(chip(responseKind(event),kindColor(responseKind(event))))
+        titleRow.addView(chip(responseKind(event),NetworkDebuggerRowPresentation.kindColor(responseKind(event),WebUiTheme.palette(this))))
         header.addView(titleRow)
         header.addView(TextView(this).apply{text=url;setTextColor(textColor);textSize=11f;typeface=Typeface.MONOSPACE;setTextIsSelectable(true);setPadding(0,dp(7),0,0)})
-        val flags=rowFlags(event)
+        val flags=NetworkDebuggerRowPresentation.flags(event,changedIds)
         if(flags.isNotBlank())header.addView(TextView(this).apply{text=flags;setTextColor(amber);textSize=9f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);setPadding(0,dp(6),0,0)})
         root.addView(header,LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,0,0,dp(7))})
 
@@ -797,7 +751,6 @@ class NetworkDebuggerActivity : AppCompatActivity() {
 
     private fun chip(label:String,color:Int)=TextView(this).apply{text=label;setTextColor(color);textSize=10f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);gravity=Gravity.CENTER;setPadding(dp(8),dp(4),dp(8),dp(4));background=rounded(panel2,8f,line)}
 
-    private fun kindColor(kind:String)=when(kind){"JSON"->cyan;"HTML"->violet;"JS"->amber;"CSS"->accent;"IMG"->amber;"PDF"->bad;"TEXT"->textColor;"BIN"->muted;else->muted}
 
     private fun subtitle(label:String)=TextView(this).apply{text=label;setTextColor(muted);textSize=9f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);letterSpacing=.08f;setPadding(dp(3),dp(6),dp(3),dp(4))}
 
@@ -858,44 +811,5 @@ class NetworkDebuggerActivity : AppCompatActivity() {
     private fun rounded(fill:Int,radius:Float,stroke:Int=Color.TRANSPARENT)=GradientDrawable().apply{shape=GradientDrawable.RECTANGLE;setColor(fill);cornerRadius=dp(radius.toInt()).toFloat();if(stroke!=Color.TRANSPARENT)setStroke(dp(1),stroke)}
     private fun compactButton(label:String,click:()->Unit)=Button(this).apply{text=label;setTextColor(textColor);textSize=10f;isAllCaps=false;minWidth=0;minimumWidth=0;minHeight=0;minimumHeight=0;setPadding(dp(10),0,dp(10),0);background=rounded(panel2,10f,line);setOnClickListener{click()}}
 
-    private fun actionLabel(event:JSONObject):String{
-        val action=event.optString("action","action").uppercase(Locale.US);val target=event.optJSONObject("target");val name=target?.optString("text","")?.trim()?.take(80).orEmpty().ifBlank{target?.optString("id","")?.takeIf{it.isNotBlank()}?:target?.optString("role","")?.takeIf{it.isNotBlank()}?:target?.optString("tag","").orEmpty()};return if(name.isBlank())action else "$action  \"$name\""
-    }
 
-    inner class EventAdapter:BaseAdapter(){
-        override fun getCount()=items.size
-        override fun getItem(position:Int)=items[position]
-        override fun getItemId(position:Int)=position.toLong()
-
-        override fun getView(position:Int,convertView:View?,parent:ViewGroup?):View{
-            val event=getItem(position)
-            val row=(convertView as? LinearLayout)?.takeIf{it.findViewWithTag<TextView>("top")!=null}?:LinearLayout(this@NetworkDebuggerActivity).apply{
-                orientation=LinearLayout.VERTICAL;setPadding(dp(10),dp(7),dp(10),dp(7))
-                addView(LinearLayout(this@NetworkDebuggerActivity).apply{
-                    orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL
-                    addView(TextView(this@NetworkDebuggerActivity).apply{tag="top";textSize=10.5f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);maxLines=2},LinearLayout.LayoutParams(0,-2,1f))
-                    addView(TextView(this@NetworkDebuggerActivity).apply{tag="kind";textSize=9f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);gravity=Gravity.CENTER;setPadding(dp(7),dp(3),dp(7),dp(3));background=rounded(panel2,7f,line)},LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(8)})
-                })
-                addView(TextView(this@NetworkDebuggerActivity).apply{tag="url";textSize=9.5f;typeface=Typeface.MONOSPACE;maxLines=2;setPadding(0,dp(3),0,0)})
-                addView(TextView(this@NetworkDebuggerActivity).apply{tag="flags";textSize=8.5f;typeface=Typeface.create(Typeface.MONOSPACE,Typeface.BOLD);setPadding(0,dp(4),0,0)})
-            }
-            val top=row.findViewWithTag<TextView>("top");val url=row.findViewWithTag<TextView>("url");val kind=row.findViewWithTag<TextView>("kind");val flagsView=row.findViewWithTag<TextView>("flags")
-
-            if(isActionEvent(event)){
-                row.background=rounded(panel2,8f,line);kind.visibility=View.GONE;flagsView.visibility=View.GONE;val whenText=if(event.has("time"))listTime(event.optLong("time")) else "--:--:--.---";top.text="────  $whenText · ${actionLabel(event)}  ────";top.setTextColor(amber);url.text=event.optString("page","—");url.setTextColor(muted);return row
-            }
-
-            row.background=rounded(panel,8f,Color.rgb(26,48,39));kind.visibility=View.VISIBLE
-            if(isRealtimeSession(event)){
-                val whenText=if(event.has("time"))listTime(event.optLong("time")) else "--:--:--.---";top.text="$whenText  ${methodOf(event)}  · ${event.optInt("_sessionCount",0)} событий";top.setTextColor(cyan);kind.text=methodOf(event);kind.setTextColor(cyan);url.text=event.optString("url","—");url.setTextColor(muted);flagsView.visibility=View.GONE;return row
-            }
-
-            val status=event.optInt("status",0);val source=sourceSummary(event);val method=methodOf(event);val whenText=if(event.has("time"))listTime(event.optLong("time")) else "--:--:--.---"
-            top.text=buildString{append(whenText).append("  ").append(if(isJsEvent(event))"JS" else method);if(status>0)append("  ").append(status);if(event.has("duration"))append("  ").append(NetworkDebuggerText.formatDuration(event.optDouble("duration",0.0)));if(event.has("responseSize"))append("  ").append(NetworkDebuggerText.formatBytes(event.optLong("responseSize")));append("  · ").append(source)}
-            top.setTextColor(if(status>=400||event.has("error"))bad else if(isJsEvent(event)||status in 200..399)accent else textColor)
-            val kindText=responseKind(event);kind.text=kindText;kind.setTextColor(kindColor(kindText));url.text=event.optString("url",event.optString("message","—"));url.setTextColor(muted)
-            val flags=rowFlags(event);flagsView.text=flags;flagsView.visibility=if(flags.isBlank())View.GONE else View.VISIBLE;flagsView.setTextColor(if(flags.contains("CHANGED")||hasAuth(event)||flags.contains("REPLAY"))amber else muted)
-            return row
-        }
-    }
 }
