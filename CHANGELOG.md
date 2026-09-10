@@ -3,6 +3,26 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v27-START -->
+## v27 — 2026-09-10T12:22:56Z
+
+- Release commit: `90ad694a9530993316136d6ec98e48c671c3dd97`
+- Artifact: `web-research-v27.apk`
+- SHA-256: `8ae44ec6ec850060d89e89178394a7fb43f8335720dfebe5b288c1edcb66a74d`
+- Previous release: **v26**
+
+### Changes
+
+- test: add deterministic capture regression suite
+- release: publish regression guard [release]
+
+### Changed files
+
+- `.github/actions/build-apk/action.yml`
+- `app/build.gradle.kts`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+- `app/src/test/resources/session-fixture.json`
+<!-- AUTO-CHANGELOG-v27-END -->
 <!-- AUTO-CHANGELOG-v26-START -->
 ## v26 — 2026-09-10T12:14:46Z
 
