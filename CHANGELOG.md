@@ -3,6 +3,23 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v26-START -->
+## v26 — 2026-09-10T12:14:46Z
+
+- Release commit: `b188f7279f6c3d5fab467d058c9a4949821cd310`
+- Artifact: `web-research-v26.apk`
+- SHA-256: `82330cacb7aeef813c972f63feb0ffdefb56e1e01ea2ab9e81b169c21ef4e347`
+- Previous release: **v25**
+
+### Changes
+
+- docs: align architecture with v25
+- release: publish architecture audit [release]
+
+### Changed files
+
+- Нет файловых изменений.
+<!-- AUTO-CHANGELOG-v26-END -->
 <!-- AUTO-CHANGELOG-v25-START -->
 ## v25 — 2026-09-10T10:06:39Z
 

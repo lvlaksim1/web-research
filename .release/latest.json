@@ -1,27 +1,20 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 25,
-  "tag": "v25",
-  "versionCode": 25,
-  "versionName": "v25",
+  "releaseNumber": 26,
+  "tag": "v26",
+  "versionCode": 26,
+  "versionName": "v26",
   "packageId": "web.research",
-  "commit": "485dcfbfd37a54e87174ed7551f577d8373b6421",
-  "artifact": "web-research-v25.apk",
-  "sha256": "dbfcf5e671790d6fa1d3a2088fcc34675d40a8514de91c40d1a9760bc0519833",
-  "publishedAt": "2026-09-10T10:06:39Z",
-  "previousRelease": "v24",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v25",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v25/web-research-v25.apk",
+  "commit": "b188f7279f6c3d5fab467d058c9a4949821cd310",
+  "artifact": "web-research-v26.apk",
+  "sha256": "82330cacb7aeef813c972f63feb0ffdefb56e1e01ea2ab9e81b169c21ef4e347",
+  "publishedAt": "2026-09-10T12:14:46Z",
+  "previousRelease": "v25",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v26",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v26/web-research-v26.apk",
   "commits": [
-    "fix: remove stale debugger counter and dead activity state",
-    "fix: qualify debugger background color",
-    "ci: update README and refactoring docs on every release",
-    "release: publish debugger activity cleanup [release]"
+    "docs: align architecture with v25",
+    "release: publish architecture audit [release]"
   ],
-  "changedFiles": [
-    ".github/scripts/update-release-docs.py",
-    ".github/workflows/android-apk.yml",
-    ".github/workflows/validate-work-branches.yml",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt"
-  ]
+  "changedFiles": []
 }
