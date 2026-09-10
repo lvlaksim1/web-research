@@ -3,6 +3,27 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v17-START -->
+## v17 — 2026-09-10T02:11:53Z
+
+- Release commit: `ab8ec82db13a369c437e4335a5d8de61dda4b10a`
+- Artifact: `web-research-v17.apk`
+- SHA-256: `db1e70a12d9a41539ce82756544a490e5f4d172f78d78229419d1a288d0ba057`
+- Previous release: **v16**
+
+### Changes
+
+- refactor: extract browser menu controller
+- refactor: keep activity accent propagation
+- refactor: extract browser layout construction
+- release: publish browser activity refactor [release]
+
+### Changed files
+
+- `app/src/main/java/ru/evrasia/research/WebResearchBrowserLayout.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchMenuController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
+<!-- AUTO-CHANGELOG-v17-END -->
 <!-- AUTO-CHANGELOG-v16-START -->
 ## v16 — 2026-09-10T01:54:40Z
 

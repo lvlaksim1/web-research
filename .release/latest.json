@@ -1,32 +1,26 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 16,
-  "tag": "v16",
-  "versionCode": 16,
-  "versionName": "v16",
+  "releaseNumber": 17,
+  "tag": "v17",
+  "versionCode": 17,
+  "versionName": "v17",
   "packageId": "web.research",
-  "commit": "9af900940abfc3a791d34700a2407e6c330c9082",
-  "artifact": "web-research-v16.apk",
-  "sha256": "b5562228e04a2c2de6b0daf3095937a5cc7602d169b225a016c2e616544d2539",
-  "publishedAt": "2026-09-10T01:54:40Z",
-  "previousRelease": "v15",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v16",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v16/web-research-v16.apk",
+  "commit": "ab8ec82db13a369c437e4335a5d8de61dda4b10a",
+  "artifact": "web-research-v17.apk",
+  "sha256": "db1e70a12d9a41539ce82756544a490e5f4d172f78d78229419d1a288d0ba057",
+  "publishedAt": "2026-09-10T02:11:53Z",
+  "previousRelease": "v16",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v17",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v17/web-research-v17.apk",
   "commits": [
-    "refactor: split debugger projection and text formatting",
-    "refactor: centralize shared cookie trace logic",
-    "refactor: separate raw archive from export generation",
-    "release: publish refactoring stages 2-4 [release]"
+    "refactor: extract browser menu controller",
+    "refactor: keep activity accent propagation",
+    "refactor: extract browser layout construction",
+    "release: publish browser activity refactor [release]"
   ],
   "changedFiles": [
-    "app/src/main/java/ru/evrasia/research/CookieTraceProvider.kt",
-    "app/src/main/java/ru/evrasia/research/CookieTraceSupport.kt",
-    "app/src/main/java/ru/evrasia/research/CookieTraceUiProvider.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerActivity.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerProjection.kt",
-    "app/src/main/java/ru/evrasia/research/NetworkDebuggerText.kt",
-    "app/src/main/java/ru/evrasia/research/ResearchArchive.kt",
-    "app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt",
-    "app/src/main/java/ru/evrasia/research/WebResearchExportController.kt"
+    "app/src/main/java/ru/evrasia/research/WebResearchBrowserLayout.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchMenuController.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt"
   ]
 }
