@@ -1,0 +1,263 @@
+package ru.evrasia.research
+
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.webkit.WebView
+import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+
+internal object WebResearchBrowserLayout {
+    data class Callbacks(
+        val onMenu: () -> Unit,
+        val onAddressGo: () -> Unit,
+        val onAddressFocusChanged: (Boolean) -> Unit,
+        val onAddressChanged: () -> Unit,
+        val onPageAction: () -> Unit,
+        val onZip: () -> Unit,
+        val onNetwork: () -> Unit
+    )
+
+    data class Views(
+        val root: LinearLayout,
+        val web: WebView,
+        val swipeRefresh: SwipeRefreshLayout,
+        val address: EditText,
+        val pageAction: Button,
+        val zipButton: Button,
+        val menuButton: Button,
+        val networkButton: Button,
+        val networkBadge: TextView,
+        val progress: ProgressBar
+    )
+
+    fun create(
+        activity: AppCompatActivity,
+        palette: WebUiTheme.Palette,
+        handler: Handler,
+        callbacks: Callbacks
+    ): Views {
+        fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
+        fun rounded(fill: Int, radius: Float, stroke: Int = Color.TRANSPARENT): GradientDrawable =
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(fill)
+                cornerRadius = dp(radius.toInt()).toFloat()
+                if (stroke != Color.TRANSPARENT) setStroke(dp(1), stroke)
+            }
+        fun iconButton(kind: TechIconDrawable.Kind, strong: Boolean, click: () -> Unit): Button =
+            Button(activity).apply {
+                text = ""
+                contentDescription = when (kind) {
+                    TechIconDrawable.Kind.MENU -> "Меню"
+                    TechIconDrawable.Kind.NETWORK -> "Network / Research"
+                    TechIconDrawable.Kind.NAVIGATE -> "Перейти"
+                    TechIconDrawable.Kind.BACK -> "Назад"
+                }
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = 0
+                minimumHeight = 0
+                setPadding(dp(9), dp(9), dp(9), dp(9))
+                background = rounded(
+                    if (strong) palette.card else Color.TRANSPARENT,
+                    16f,
+                    if (strong) palette.divider else Color.TRANSPARENT
+                )
+                foreground = TechIconDrawable(kind, palette.accent)
+                setOnClickListener { click() }
+            }
+
+        val root = LinearLayout(activity).apply {
+            tag = "web-research-root"
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(palette.background)
+        }
+
+        val toolbar = LinearLayout(activity).apply {
+            tag = "browser-toolbar"
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(7), dp(6), dp(7), dp(6))
+            setBackgroundColor(palette.background)
+            clipChildren = true
+            clipToPadding = true
+        }
+
+        val menuButton = iconButton(TechIconDrawable.Kind.MENU, false, callbacks.onMenu)
+        toolbar.addView(menuButton, LinearLayout.LayoutParams(dp(42), dp(46)))
+
+        val address = EditText(activity).apply {
+            tag = "browser-address"
+            hint = "Адрес сайта"
+            setHintTextColor(palette.secondary)
+            setTextColor(palette.text)
+            setSingleLine(true)
+            textSize = 14f
+            imeOptions = EditorInfo.IME_ACTION_GO
+            background = rounded(palette.address, 22f)
+            setPadding(dp(14), 0, dp(14), 0)
+            setText("https://evrasia.rest/")
+            setSelectAllOnFocus(true)
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_GO) {
+                    callbacks.onAddressGo()
+                    true
+                } else {
+                    false
+                }
+            }
+            onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                callbacks.onAddressFocusChanged(hasFocus)
+            }
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    callbacks.onAddressChanged()
+                }
+                override fun afterTextChanged(s: Editable?) = Unit
+            })
+        }
+        toolbar.addView(address, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(4) })
+
+        val pageAction = Button(activity).apply {
+            tag = "browser-page-action"
+            text = "→"
+            textSize = 21f
+            setTextColor(palette.accent)
+            isAllCaps = false
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(0, 0, 0, 0)
+            background = rounded(palette.card, 16f, palette.divider)
+            setOnClickListener { callbacks.onPageAction() }
+        }
+        toolbar.addView(pageAction, LinearLayout.LayoutParams(dp(42), dp(46)).apply { marginStart = dp(5) })
+
+        val zipButton = Button(activity).apply {
+            tag = "browser-zip"
+            text = "ZIP"
+            contentDescription = "Экспорт ZIP"
+            isAllCaps = false
+            textSize = 9.5f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(palette.accent)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(4), 0, dp(4), 0)
+            background = rounded(palette.card, 13f, palette.divider)
+            setOnClickListener { callbacks.onZip() }
+        }
+        toolbar.addView(zipButton, LinearLayout.LayoutParams(dp(54), dp(46)).apply { marginStart = dp(4) })
+
+        val networkContainer = FrameLayout(activity).apply {
+            tag = "browser-network"
+            clipChildren = true
+            clipToPadding = true
+        }
+        val networkButton = iconButton(TechIconDrawable.Kind.NETWORK, true, callbacks.onNetwork)
+        networkContainer.addView(networkButton, FrameLayout.LayoutParams(dp(46), dp(46), Gravity.CENTER))
+        val networkBadge = TextView(activity).apply {
+            tag = "network-badge"
+            visibility = View.GONE
+            setTextColor(WebUiTheme.contrastText(palette.accent))
+            textSize = 8.5f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            minWidth = dp(17)
+            maxLines = 1
+            setPadding(dp(3), 0, dp(3), 0)
+            background = rounded(palette.accent, 9f)
+        }
+        networkContainer.addView(
+            networkBadge,
+            FrameLayout.LayoutParams(-2, dp(17), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(3)
+                marginEnd = dp(3)
+            }
+        )
+        toolbar.addView(networkContainer, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginStart = dp(4) })
+        root.addView(toolbar, LinearLayout.LayoutParams(-1, dp(58)))
+
+        val progress = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            tag = "browser-progress"
+            max = 100
+            progressTintList = ColorStateList.valueOf(palette.accent)
+            progressBackgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+            visibility = View.INVISIBLE
+        }
+        root.addView(progress, LinearLayout.LayoutParams(-1, dp(2)))
+
+        val web = WebView(activity).apply {
+            tag = "browser-webview"
+            setBackgroundColor(Color.WHITE)
+        }
+        lateinit var swipeRefresh: SwipeRefreshLayout
+        swipeRefresh = SwipeRefreshLayout(activity).apply {
+            tag = "browser-webview-container"
+            setColorSchemeColors(palette.accent)
+            setProgressBackgroundColorSchemeColor(palette.card)
+            setOnChildScrollUpCallback { _, _ -> web.canScrollVertically(-1) }
+            setOnRefreshListener {
+                web.reload()
+                handler.postDelayed({ swipeRefresh.isRefreshing = false }, 15000)
+            }
+            addView(web, ViewGroup.LayoutParams(-1, -1))
+        }
+        root.addView(swipeRefresh, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        return Views(
+            root = root,
+            web = web,
+            swipeRefresh = swipeRefresh,
+            address = address,
+            pageAction = pageAction,
+            zipButton = zipButton,
+            menuButton = menuButton,
+            networkButton = networkButton,
+            networkBadge = networkBadge,
+            progress = progress
+        )
+    }
+
+    fun applyAccent(
+        activity: AppCompatActivity,
+        views: Views,
+        palette: WebUiTheme.Palette
+    ) {
+        val accent = palette.accent
+        fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
+        fun rounded(fill: Int, radius: Float): GradientDrawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fill)
+            cornerRadius = dp(radius.toInt()).toFloat()
+        }
+        views.pageAction.setTextColor(accent)
+        views.zipButton.setTextColor(accent)
+        views.menuButton.foreground = TechIconDrawable(TechIconDrawable.Kind.MENU, accent)
+        views.networkButton.foreground = TechIconDrawable(TechIconDrawable.Kind.NETWORK, accent)
+        views.networkBadge.setTextColor(WebUiTheme.contrastText(accent))
+        views.networkBadge.background = rounded(accent, 9f)
+        views.progress.progressTintList = ColorStateList.valueOf(accent)
+        views.swipeRefresh.setColorSchemeColors(accent)
+    }
+}

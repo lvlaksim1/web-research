@@ -3,26 +3,14 @@ package ru.evrasia.research
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
-import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -47,6 +35,7 @@ class WebResearchV10Activity : AppCompatActivity() {
     }
 
     private lateinit var palette: WebUiTheme.Palette
+    private lateinit var browserViews: WebResearchBrowserLayout.Views
     private lateinit var web: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var address: EditText
@@ -78,147 +67,39 @@ class WebResearchV10Activity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         configureSystemBars()
 
-        val root = LinearLayout(this).apply {
-            tag = "web-research-root"
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(palette.background)
-        }
-
-        val toolbar = LinearLayout(this).apply {
-            tag = "browser-toolbar"
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(7), dp(6), dp(7), dp(6))
-            setBackgroundColor(palette.background)
-            clipChildren = true
-            clipToPadding = true
-        }
-
-        menuButton = iconButton(TechIconDrawable.Kind.MENU, false) { if (::menuController.isInitialized) menuController.toggleBrowserMenu() }
-        toolbar.addView(menuButton, LinearLayout.LayoutParams(dp(42), dp(46)))
-
-        address = EditText(this).apply {
-            tag = "browser-address"
-            hint = "Адрес сайта"
-            setHintTextColor(palette.secondary)
-            setTextColor(palette.text)
-            setSingleLine(true)
-            textSize = 14f
-            imeOptions = EditorInfo.IME_ACTION_GO
-            background = rounded(palette.address, 22f)
-            setPadding(dp(14), 0, dp(14), 0)
-            setText("https://evrasia.rest/")
-            setSelectAllOnFocus(true)
-            setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_GO) {
-                    navigateFromAddress()
-                    true
-                } else false
-            }
-            onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                editingAddress = hasFocus
-                updatePageAction()
-            }
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    if (hasFocus()) editingAddress = true
+        browserViews = WebResearchBrowserLayout.create(
+            activity = this,
+            palette = palette,
+            handler = uiHandler,
+            callbacks = WebResearchBrowserLayout.Callbacks(
+                onMenu = { if (::menuController.isInitialized) menuController.toggleBrowserMenu() },
+                onAddressGo = { navigateFromAddress() },
+                onAddressFocusChanged = { hasFocus ->
+                    editingAddress = hasFocus
                     updatePageAction()
+                },
+                onAddressChanged = {
+                    if (::address.isInitialized && address.hasFocus()) editingAddress = true
+                    updatePageAction()
+                },
+                onPageAction = { handlePageAction() },
+                onZip = { exportZip() },
+                onNetwork = {
+                    ensureInstrumentation()
+                    startActivity(Intent(this, NetworkDebuggerActivity::class.java))
                 }
-                override fun afterTextChanged(s: Editable?) = Unit
-            })
-        }
-        toolbar.addView(address, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(4) })
-
-        pageAction = Button(this).apply {
-            tag = "browser-page-action"
-            text = "→"
-            textSize = 21f
-            setTextColor(palette.accent)
-            isAllCaps = false
-            minWidth = 0
-            minimumWidth = 0
-            minHeight = 0
-            minimumHeight = 0
-            setPadding(0, 0, 0, 0)
-            background = rounded(palette.card, 16f, palette.divider)
-            setOnClickListener { handlePageAction() }
-        }
-        toolbar.addView(pageAction, LinearLayout.LayoutParams(dp(42), dp(46)).apply { marginStart = dp(5) })
-
-        zipButton = Button(this).apply {
-            tag = "browser-zip"
-            text = "ZIP"
-            contentDescription = "Экспорт ZIP"
-            isAllCaps = false
-            textSize = 9.5f
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setTextColor(palette.accent)
-            minWidth = 0
-            minimumWidth = 0
-            minHeight = 0
-            minimumHeight = 0
-            setPadding(dp(4), 0, dp(4), 0)
-            background = rounded(palette.card, 13f, palette.divider)
-            setOnClickListener { exportZip() }
-        }
-        toolbar.addView(zipButton, LinearLayout.LayoutParams(dp(54), dp(46)).apply { marginStart = dp(4) })
-
-        val networkContainer = FrameLayout(this).apply {
-            tag = "browser-network"
-            clipChildren = true
-            clipToPadding = true
-        }
-        networkButton = iconButton(TechIconDrawable.Kind.NETWORK, true) {
-            ensureInstrumentation()
-            startActivity(Intent(this, NetworkDebuggerActivity::class.java))
-        }
-        networkContainer.addView(networkButton, FrameLayout.LayoutParams(dp(46), dp(46), Gravity.CENTER))
-        networkBadge = TextView(this).apply {
-            tag = "network-badge"
-            visibility = View.GONE
-            setTextColor(WebUiTheme.contrastText(palette.accent))
-            textSize = 8.5f
-            typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            minWidth = dp(17)
-            maxLines = 1
-            setPadding(dp(3), 0, dp(3), 0)
-            background = rounded(palette.accent, 9f)
-        }
-        networkContainer.addView(networkBadge, FrameLayout.LayoutParams(-2, dp(17), Gravity.TOP or Gravity.END).apply {
-            topMargin = dp(3)
-            marginEnd = dp(3)
-        })
-        toolbar.addView(networkContainer, LinearLayout.LayoutParams(dp(46), dp(46)).apply { marginStart = dp(4) })
-        root.addView(toolbar, LinearLayout.LayoutParams(-1, dp(58)))
-
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            tag = "browser-progress"
-            max = 100
-            progressTintList = ColorStateList.valueOf(palette.accent)
-            progressBackgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            visibility = View.INVISIBLE
-        }
-        root.addView(progress, LinearLayout.LayoutParams(-1, dp(2)))
-
-        web = WebView(this).apply {
-            tag = "browser-webview"
-            setBackgroundColor(Color.WHITE)
-        }
-        swipeRefresh = SwipeRefreshLayout(this).apply {
-            tag = "browser-webview-container"
-            setColorSchemeColors(palette.accent)
-            setProgressBackgroundColorSchemeColor(palette.card)
-            setOnChildScrollUpCallback { _, _ -> web.canScrollVertically(-1) }
-            setOnRefreshListener {
-                web.reload()
-                uiHandler.postDelayed({ if (::swipeRefresh.isInitialized) swipeRefresh.isRefreshing = false }, 15000)
-            }
-            addView(web, ViewGroup.LayoutParams(-1, -1))
-        }
-        root.addView(swipeRefresh, LinearLayout.LayoutParams(-1, 0, 1f))
+            )
+        )
+        web = browserViews.web
+        swipeRefresh = browserViews.swipeRefresh
+        address = browserViews.address
+        pageAction = browserViews.pageAction
+        zipButton = browserViews.zipButton
+        menuButton = browserViews.menuButton
+        networkButton = browserViews.networkButton
+        networkBadge = browserViews.networkBadge
+        progress = browserViews.progress
+        val root = browserViews.root
         setContentView(root)
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -334,46 +215,11 @@ class WebResearchV10Activity : AppCompatActivity() {
         val opaque = color or 0xFF000000.toInt()
         if (persist) WebUiTheme.saveAccentColor(this, opaque)
         palette = palette.copy(accent = opaque)
-        if (::pageAction.isInitialized) pageAction.setTextColor(opaque)
-        if (::zipButton.isInitialized) zipButton.setTextColor(opaque)
-        if (::menuButton.isInitialized) menuButton.foreground = TechIconDrawable(TechIconDrawable.Kind.MENU, opaque)
-        if (::networkButton.isInitialized) networkButton.foreground = TechIconDrawable(TechIconDrawable.Kind.NETWORK, opaque)
-        if (::networkBadge.isInitialized) {
-            networkBadge.setTextColor(WebUiTheme.contrastText(opaque))
-            networkBadge.background = rounded(opaque, 9f)
-        }
-        if (::progress.isInitialized) progress.progressTintList = ColorStateList.valueOf(opaque)
-        if (::swipeRefresh.isInitialized) swipeRefresh.setColorSchemeColors(opaque)
+        if (::browserViews.isInitialized) WebResearchBrowserLayout.applyAccent(this, browserViews, palette)
         if (::menuController.isInitialized) menuController.updateAccent(opaque)
     }
 
-    private fun iconButton(kind: TechIconDrawable.Kind, strong: Boolean, click: () -> Unit) = Button(this).apply {
-        text = ""
-        contentDescription = when (kind) {
-            TechIconDrawable.Kind.MENU -> "Меню"
-            TechIconDrawable.Kind.NETWORK -> "Network / Research"
-            TechIconDrawable.Kind.NAVIGATE -> "Перейти"
-            TechIconDrawable.Kind.BACK -> "Назад"
-        }
-        minWidth = 0
-        minimumWidth = 0
-        minHeight = 0
-        minimumHeight = 0
-        setPadding(dp(9), dp(9), dp(9), dp(9))
-        background = rounded(if (strong) palette.card else Color.TRANSPARENT, 16f, if (strong) palette.divider else Color.TRANSPARENT)
-        foreground = TechIconDrawable(kind, palette.accent)
-        setOnClickListener { click() }
-    }
-
     private fun currentPage(): String = web.url ?: address.text?.toString().orEmpty()
-
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-    private fun rounded(fill: Int, radius: Float, stroke: Int = Color.TRANSPARENT) = GradientDrawable().apply {
-        shape = GradientDrawable.RECTANGLE
-        setColor(fill)
-        cornerRadius = dp(radius.toInt()).toFloat()
-        if (stroke != Color.TRANSPARENT) setStroke(dp(1), stroke)
-    }
 
     fun requestResourceCopy(url: String, headersJson: JSONObject?): Boolean =
         if (::captureController.isInitialized) captureController.requestResourceCopy(url, headersJson) else false
