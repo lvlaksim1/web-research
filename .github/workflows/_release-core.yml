@@ -62,11 +62,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/tags?per_page=100" --jq '.[].name')
-          LAST=$(printf '%s\n' "$TAGS" | sed -nE 's/^v([0-9]+)$/\1/p' | sort -n | tail -1)
+          RELEASE_TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          LAST=$(printf '%s\n' "$RELEASE_TAGS" | sed -nE 's/^v([0-9]+)$/\1/p' | sort -n | tail -1)
 
           if [ -z "$LAST" ]; then
             LAST=0
+            echo "No published stable numeric releases found; next release will be v1"
+          else
+            echo "Latest published stable numeric release: v$LAST"
           fi
 
           NEXT=$((LAST + 1))

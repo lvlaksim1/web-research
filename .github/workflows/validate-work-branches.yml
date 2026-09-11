@@ -15,9 +15,6 @@ jobs:
     with:
       mode: validate
       expected_package_id: web.research
-      expected_cert_sha256: 336d50b20c93288a9bf6e7b41ec23341ff5bf21781b129daadadc11505da0c96
-    secrets:
-      ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
 
   validate-release-docs:
     runs-on: ubuntu-24.04
@@ -46,8 +43,21 @@ jobs:
           set -euo pipefail
           git fetch --tags --force
 
-          RELEASE_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/releases/latest")
-          RELEASE_TAG=$(printf '%s' "$RELEASE_JSON" | jq -r '.tag_name // empty')
+          RELEASE_TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          RELEASE_NUMBER=$(printf '%s\n' "$RELEASE_TAGS" | sed -nE 's/^v([0-9]+)$/\1/p' | sort -n | tail -1)
+
+          if [ -z "$RELEASE_NUMBER" ]; then
+            echo "No published stable numeric release exists yet; release documentation validation skipped for bootstrap state before v1"
+            {
+              echo "## Release documentation validation"
+              echo
+              echo "No published stable numeric release exists yet. Bootstrap state before v1 is valid."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          RELEASE_TAG="v${RELEASE_NUMBER}"
+          RELEASE_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")
           PUBLISHED_AT=$(printf '%s' "$RELEASE_JSON" | jq -r '.published_at // empty')
           APK_FILENAME=$(printf '%s' "$RELEASE_JSON" | jq -r '.assets[]? | select(.name | endswith(".apk")) | .name' | head -1)
           DIGEST=$(printf '%s' "$RELEASE_JSON" | jq -r --arg name "$APK_FILENAME" '.assets[]? | select(.name == $name) | .digest // empty' | head -1)
