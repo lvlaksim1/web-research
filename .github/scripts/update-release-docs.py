@@ -41,7 +41,7 @@ def ensure_refactoring_document(path: Path) -> None:
     if path.exists():
         return
     path.write_text(
-        "# Рефакторинг web research\n\n"
+        f"# Рефакторинг {path.parent.name}\n\n"
         "Автоматическая контрольная точка текущего состояния рефакторинга. "
         "Детальные архитектурные инварианты описаны в `ARCHITECTURE.md`.\n",
         encoding="utf-8",
@@ -132,7 +132,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[2]
     previous = previous_tag(release_number)
     subjects, changed_files = release_changes(previous, args.release_commit)
-    repo = os.environ.get("GITHUB_REPOSITORY", "lvlaksim1/web-research")
+    repo = os.environ.get("GITHUB_REPOSITORY", f"lvlaksim1/{root.name}")
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
     release_url = f"{server}/{repo}/releases/tag/{args.release_tag}"
     artifact_url = f"{server}/{repo}/releases/download/{args.release_tag}/{args.artifact_filename}"
