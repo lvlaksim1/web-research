@@ -48,6 +48,18 @@ debugger projection / display
 
 В ZIP эти данные дополнительно представлены как производные `timeline.json` и `relations.json`. Временная корреляция является inference и не выдаётся за доказанную JavaScript-causality; точная причинность относится к отдельному следующему слою.
 
+## JS causality
+
+Forensic relations теперь извлекают JavaScript initiator из `initiatorStack`, который browser-side instrumentation уже фиксирует синхронно при старте `fetch`/XHR. Для каждого устойчивого stack frame строится `initiatorId`, а в `relations.json` появляются `initiators`, `causalityChains` и связи `initiator-to-request`.
+
+Уровни доказательности не смешиваются:
+
+- `observed-initiator-stack` — стек непосредственно наблюдался в момент начала запроса;
+- `observed-browser-event-context` — поддерживаемая schema для точной связи через browser action token;
+- `temporal-nearest` — только временная корреляция и не считается доказательством причинности.
+
+Мы намеренно не подменяем `EventTarget.addEventListener` глобальной обёрткой: это могло бы менять идентичность listener-функций, порядок removeEventListener и семантику исследуемой страницы. Для неизвестных связей сохраняется inferred-классификация вместо вмешательства в приложение.
+
 ## Checkpoints и before/after diff
 
 Этап checkpoints добавляет ограниченные по памяти снимки состояния в ключевых точках сессии. `CheckpointController` принимает browser-side state, добавляет native cookies, делает ограниченный viewport screenshot и сохраняет checkpoint через `ResearchArchive.addCheckpoint`.
