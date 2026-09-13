@@ -124,8 +124,6 @@ internal class CheckpointController(
 
     private fun captureOnUi(reason: String, state: JSONObject) {
         if (activity.isFinishing || activity.isDestroyed) return
-        val now = System.currentTimeMillis()
-
         if (checkpointCount >= MAX_CHECKPOINTS) {
             if (!checkpointLimitWarningSent) {
                 checkpointLimitWarningSent = true
