@@ -25,12 +25,14 @@ internal class ForensicTimeline(
         private const val MAX_RECENT_REQUESTS = 512
     }
 
-    private data class ActionHint(val id: String, val time: Long)
+    private data class ActionHint(val id: String, val time: Long, val windowId: String, val frameId: String)
     private data class RequestHint(
         val id: String,
         val time: Long,
         val method: String,
         val url: String,
+        val windowId: String,
+        val frameId: String,
         var claimedByBrowserApi: Boolean = false
     )
 
@@ -64,7 +66,7 @@ internal class ForensicTimeline(
                     id("action", actionCounter)
                 }
                 record.put("actionId", actionId)
-                val hint = ActionHint(actionId, eventTime)
+                val hint = ActionHint(actionId, eventTime, record.optString("windowId", ""), record.optString("frameId", ""))
                 rememberAction(hint)
                 val token = record.optString("browserActionToken", "")
                 if (token.isNotBlank()) rememberBrowserAction(token, hint)
@@ -77,7 +79,9 @@ internal class ForensicTimeline(
                         id = requestId,
                         time = eventTime,
                         method = methodOf(record),
-                        url = comparableUrl(record.optString("url", ""))
+                        url = comparableUrl(record.optString("url", "")),
+                        windowId = record.optString("windowId", ""),
+                        frameId = record.optString("frameId", "")
                     )
                 )
             }
@@ -92,7 +96,9 @@ internal class ForensicTimeline(
                         id = requestId,
                         time = eventTime,
                         method = methodOf(record),
-                        url = comparableUrl(record.optString("url", ""))
+                        url = comparableUrl(record.optString("url", "")),
+                        windowId = record.optString("windowId", ""),
+                        frameId = record.optString("frameId", "")
                     )
                 )
                 if (!linkBrowserAction(record)) linkNearestAction(record, eventTime)
@@ -108,7 +114,7 @@ internal class ForensicTimeline(
                     record.put("mutationId", id("mutation", mutationCounter))
                 }
                 if (!linkBrowserAction(record)) linkNearestAction(record, eventTime)
-                nearestApplicationRequest(eventTime)?.let {
+                nearestApplicationRequest(eventTime, record)?.let {
                     record.put("relatedRequestId", it.id)
                     record.put("requestRelation", "temporal-nearest")
                 }
@@ -120,14 +126,23 @@ internal class ForensicTimeline(
                     record.put("checkpointId", id("checkpoint", checkpointCounter))
                 }
                 linkNearestAction(record, eventTime)
-                nearestApplicationRequest(eventTime)?.let {
+                nearestApplicationRequest(eventTime, record)?.let {
                     record.put("relatedRequestId", it.id)
                     record.put("requestRelation", "temporal-nearest")
                 }
             }
 
+            "window-created" -> {
+                linkNearestAction(
+                    record,
+                    eventTime,
+                    windowOverride = record.optString("openerWindowId", ""),
+                    frameOverride = ""
+                )
+            }
+
             "navigation", "history", "websocket-open", "websocket-send", "sse-open",
-            "window-created", "window-activated", "window-closed", "frame-lifecycle" -> {
+            "window-activated", "window-closed", "frame-lifecycle" -> {
                 linkNearestAction(record, eventTime)
             }
         }
@@ -149,11 +164,13 @@ internal class ForensicTimeline(
     private fun matchWebViewRequest(record: JSONObject, eventTime: Long): RequestHint? {
         val method = methodOf(record)
         val url = comparableUrl(record.optString("url", ""))
+        val windowId = record.optString("windowId", "")
         var best: RequestHint? = null
         var bestDelta = Long.MAX_VALUE
         for (candidate in recentWebViewRequests) {
             if (candidate.claimedByBrowserApi) continue
             if (candidate.method != method || candidate.url != url) continue
+            if (windowId.isNotBlank() && candidate.windowId != windowId) continue
             val delta = abs(candidate.time - eventTime)
             if (delta <= REQUEST_MATCH_WINDOW_MS && delta < bestDelta) {
                 best = candidate
@@ -168,20 +185,33 @@ internal class ForensicTimeline(
         val token = record.optString("browserActionToken", "")
         if (token.isBlank()) return false
         val action = browserActionTokens[token] ?: return false
+        val windowId = record.optString("windowId", "")
+        val frameId = record.optString("frameId", "")
+        if (windowId.isNotBlank() && action.windowId != windowId) return false
+        if (frameId.isNotBlank() && action.frameId != frameId) return false
         record.put("relatedActionId", action.id)
         record.put("actionRelation", "observed-browser-event-context")
         return true
     }
 
-    private fun linkNearestAction(record: JSONObject, eventTime: Long) {
-        val action = nearestAction(eventTime) ?: return
+    private fun linkNearestAction(
+        record: JSONObject,
+        eventTime: Long,
+        windowOverride: String? = null,
+        frameOverride: String? = null
+    ) {
+        val windowId = windowOverride ?: record.optString("windowId", "")
+        val frameId = frameOverride ?: record.optString("frameId", "")
+        val action = nearestAction(eventTime, windowId, frameId) ?: return
         record.put("relatedActionId", action.id)
         record.put("actionRelation", "temporal-nearest")
     }
 
-    private fun nearestAction(eventTime: Long): ActionHint? {
+    private fun nearestAction(eventTime: Long, windowId: String, frameId: String): ActionHint? {
         var best: ActionHint? = null
         for (candidate in recentActions) {
+            if (windowId.isNotBlank() && candidate.windowId != windowId) continue
+            if (frameId.isNotBlank() && candidate.frameId != frameId) continue
             val delta = eventTime - candidate.time
             if (delta < 0L || delta > ACTION_WINDOW_MS) continue
             if (best == null || candidate.time > best.time) best = candidate
@@ -189,9 +219,13 @@ internal class ForensicTimeline(
         return best
     }
 
-    private fun nearestApplicationRequest(eventTime: Long): RequestHint? {
+    private fun nearestApplicationRequest(eventTime: Long, record: JSONObject): RequestHint? {
+        val windowId = record.optString("windowId", "")
+        val frameId = record.optString("frameId", "")
         var best: RequestHint? = null
         for (candidate in recentApplicationRequests) {
+            if (windowId.isNotBlank() && candidate.windowId != windowId) continue
+            if (frameId.isNotBlank() && candidate.frameId != frameId) continue
             val delta = eventTime - candidate.time
             if (delta < 0L || delta > MUTATION_REQUEST_WINDOW_MS) continue
             if (best == null || candidate.time > best.time) best = candidate
