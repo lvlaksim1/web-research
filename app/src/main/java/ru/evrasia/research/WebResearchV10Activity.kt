@@ -298,7 +298,10 @@ class WebResearchV10Activity : AppCompatActivity() {
             zipRecordingStartedAt = System.currentTimeMillis()
             WebResearchBrowserLayout.setZipRecording(this, browserViews, true)
             zipButton.contentDescription = "Остановить запись ZIP"
-            if (::captureController.isInitialized) captureController.captureCheckpoint("recording-start")
+            if (::captureController.isInitialized) {
+                captureController.resetCheckpointWindow()
+                captureController.captureCheckpoint("recording-start")
+            }
         } else {
             val endedAt = System.currentTimeMillis()
             zipRecordingStartedAt = null

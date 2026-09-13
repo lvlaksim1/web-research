@@ -62,7 +62,7 @@ internal class CookieTraceEngine {
             observeCookieSnapshot(page, CookieManager.getInstance().getCookie(page).orEmpty(), System.currentTimeMillis())
         }
         if (traceArtifactDirty || page != lastTraceArtifactPage) {
-            archive.extraArtifacts["cookie-trace.json"] = exportJson(page).toString(2).toByteArray(Charsets.UTF_8)
+            archive.putArtifact("cookie-trace.json", exportJson(page).toString(2).toByteArray(Charsets.UTF_8))
             traceArtifactDirty = false
             lastTraceArtifactPage = page
         }

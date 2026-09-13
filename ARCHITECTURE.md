@@ -58,7 +58,7 @@ Forensic relations теперь извлекают JavaScript initiator из `in
 - `observed-browser-event-context` — поддерживаемая schema для точной связи через browser action token;
 - `temporal-nearest` — только временная корреляция и не считается доказательством причинности.
 
-Мы намеренно не подменяем `EventTarget.addEventListener` глобальной обёрткой: это могло бы менять идентичность listener-функций, порядок removeEventListener и семантику исследуемой страницы. Для неизвестных связей сохраняется inferred-классификация вместо вмешательства в приложение.
+Мы намеренно не подменяем `EventTarget.addEventListener` глобальной обёрткой: это могло бы менять идентичность listener-функций, порядок removeEventListener и семантику исследуемой страницы. Вместо этого capture-listener на `window` назначает короткоживущий `browserActionToken` на время исходного event dispatch; синхронные fetch/XHR и DOM mutation, увидевшие этот token, получают `observed-browser-event-context`. Для остальных связей сохраняется inferred-классификация.
 
 ## Checkpoints и before/after diff
 
@@ -72,7 +72,7 @@ Forensic relations теперь извлекают JavaScript initiator из `in
 - после JS error / unhandled promise rejection;
 - при старте и остановке ZIP-recording.
 
-Для защиты памяти действует лимит 40 checkpoints и 24 screenshots на сессию. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
+Лимиты checkpoint capture сбрасываются при старте каждой ZIP-записи: до 80 checkpoints и 40 viewport screenshots на recording window. Поэтому навигация до нажатия «Запись ZIP» больше не расходует ёмкость исследовательского окна. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
 
 `checkpoints/index.json` описывает точки, а `checkpoint-diffs.json` содержит производные изменения cookies, storage и DOM между соседними checkpoints. Screenshot/state artifacts лежат в `checkpoints/<checkpointId>/`.
 
@@ -105,6 +105,8 @@ Dedicated/Shared Worker runtime не перехватывается путём �
 
 ## Raw archive и экспорт
 
+При window-export scripts/resources рассматриваются как supporting evidence: если они уже были захвачены в текущей browser session до окончания записи, они включаются в ZIP даже при первом capture до `startedAt`. `cookie-trace.json` фильтруется по времени самого trace event, а не по времени последней перезаписи артефакта.
+
 `ResearchArchive` отвечает только за mutable state текущей исследовательской сессии:
 
 - `records`;
@@ -115,6 +117,8 @@ Dedicated/Shared Worker runtime не перехватывается путём �
 - clear/reset.
 
 `SessionManifestBuilder` строит только производные metadata экспорта: counters, completeness indicators, capture limits и warnings; он не изменяет raw archive.
+
+`network.har` строится только из HTTP evidence sources (`webview`, `fetch`, `xhr`, `resource-copy`, `replay`), а `api-summary.json` — из application/realtime API sources; snapshot/performance/checkpoint/error events туда больше не попадают.
 
 `ResearchArchiveExporter` является отдельным read/export слоем и строит:
 

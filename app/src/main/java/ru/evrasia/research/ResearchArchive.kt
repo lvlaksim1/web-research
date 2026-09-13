@@ -122,30 +122,58 @@ class ResearchArchive internal constructor(
             }
         }
 
+        // Scripts/resources are supporting evidence for requests inside the recording window.
+        // Keep anything already captured in the current browser session before the window ended,
+        // even if it was first loaded a few seconds before the user pressed "record".
         scripts.forEach { (key, value) ->
-            val capturedAt = scriptCapturedAt[key] ?: Long.MIN_VALUE
-            if (capturedAt in startedAt..endedAt) out.scripts[key] = value.copyOf()
+            val capturedAt = scriptCapturedAt[key] ?: return@forEach
+            if (capturedAt <= endedAt) out.scripts[key] = value.copyOf()
         }
         scriptErrors.forEach { (key, value) ->
-            val capturedAt = scriptErrorCapturedAt[key] ?: Long.MIN_VALUE
-            if (capturedAt in startedAt..endedAt) out.scriptErrors[key] = value
+            val capturedAt = scriptErrorCapturedAt[key] ?: return@forEach
+            if (capturedAt <= endedAt) out.scriptErrors[key] = value
         }
         resources.forEach { (key, value) ->
-            val capturedAt = resourceCapturedAt[key] ?: Long.MIN_VALUE
-            if (capturedAt in startedAt..endedAt) out.resources[key] = value.copyOf()
+            val capturedAt = resourceCapturedAt[key] ?: return@forEach
+            if (capturedAt <= endedAt) out.resources[key] = value.copyOf()
         }
         resourceMeta.forEach { (key, value) ->
-            val capturedAt = resourceMetaCapturedAt[key] ?: Long.MIN_VALUE
-            if (capturedAt in startedAt..endedAt) out.resourceMeta[key] = JSONObject(value.toString())
+            val capturedAt = resourceMetaCapturedAt[key] ?: return@forEach
+            if (capturedAt <= endedAt) out.resourceMeta[key] = JSONObject(value.toString())
         }
         extraArtifacts.forEach { (key, value) ->
-            val capturedAt = artifactCapturedAt[key] ?: Long.MIN_VALUE
+            if (key == "cookie-trace.json") {
+                filterCookieTraceWindow(value, startedAt, endedAt)?.let { out.extraArtifacts[key] = it }
+                return@forEach
+            }
+            val capturedAt = artifactCapturedAt[key] ?: return@forEach
             if (capturedAt in startedAt..endedAt) out.extraArtifacts[key] = value.copyOf()
         }
 
         out.snapshot = try { JSONObject(snapshot.toString()) } catch (_: Exception) { JSONObject() }
         out.snapshotCapturedAt = snapshotCapturedAt
         return out
+    }
+
+    private fun filterCookieTraceWindow(bytes: ByteArray, startedAt: Long, endedAt: Long): ByteArray? {
+        return try {
+            val source = JSONObject(bytes.toString(Charsets.UTF_8))
+            val events = source.optJSONArray("events") ?: JSONArray()
+            val filtered = JSONArray()
+            for (index in 0 until events.length()) {
+                val event = events.optJSONObject(index) ?: continue
+                val time = event.optLong("time", Long.MIN_VALUE)
+                if (time in startedAt..endedAt) filtered.put(JSONObject(event.toString()))
+            }
+            JSONObject(source.toString())
+                .put("events", filtered)
+                .put("windowStartedAt", startedAt)
+                .put("windowEndedAt", endedAt)
+                .toString(2)
+                .toByteArray(Charsets.UTF_8)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun isInlineScript(url: String): Boolean =
