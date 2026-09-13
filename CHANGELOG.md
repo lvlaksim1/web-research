@@ -3,6 +3,25 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v43-START -->
+## v43 — 2026-09-13T20:08:18Z
+
+- Release commit: `3c6ab2d9573e2152f7ae0fc22c8ce8612450e796`
+- Artifact: `web-research-v43.apk`
+- SHA-256: `fb9e835ee6cc8f4d2e334365d8e435fe75c0500c6c54784fc0c1d10e844e57d5`
+- Previous release: **v42**
+
+### Changes
+
+- Stage 3: add JS causality relations
+- release: web research v43 [release]
+
+### Changed files
+
+- `.release/requests/v43.md`
+- `CAPTURE_MATRIX.md`
+- `app/src/main/java/ru/evrasia/research/ForensicTimeline.kt`
+<!-- AUTO-CHANGELOG-v43-END -->
 <!-- AUTO-CHANGELOG-v42-START -->
 ## v42 — 2026-09-13T19:15:05Z
 
