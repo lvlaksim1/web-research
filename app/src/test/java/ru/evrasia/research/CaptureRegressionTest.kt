@@ -40,6 +40,29 @@ class CaptureRegressionTest {
     }
 
     @Test
+    fun largeResponseBodyStaysRawButDebuggerUsesBoundedPreview() {
+        val largeBody = "x".repeat(900_000)
+        val raw = JSONArray()
+        val record = JSONObject()
+            .put("source", "fetch")
+            .put("time", 1000L)
+            .put("method", "GET")
+            .put("url", "https://example.test/large")
+            .put("status", 200)
+            .put("responseBody", largeBody)
+
+        NetworkRecordPipeline.appendRawAndDebug(raw, record)
+
+        assertEquals(largeBody.length, raw.getJSONObject(0).getString("responseBody").length)
+        assertFalse(raw.getJSONObject(0).has("responseBodyTruncated"))
+
+        val debug = NetworkDebugStore.snapshot().single()
+        assertTrue(debug.getString("responseBody").length < largeBody.length)
+        assertTrue(debug.getBoolean("responseBodyTruncated"))
+        assertEquals(largeBody.length, debug.getInt("responseBodyOriginalChars"))
+    }
+
+    @Test
     fun correlatedDebuggerCopyKeepsOneRequestAndCombinesEvidence() {
         val webview = JSONObject()
             .put("source", "webview")
