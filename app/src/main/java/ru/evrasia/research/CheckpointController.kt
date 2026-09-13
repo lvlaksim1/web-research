@@ -92,7 +92,7 @@ internal class CheckpointController(
                 record(
                     CaptureWarning.create(
                         code = "checkpoint_limit_reached",
-                        message = "Checkpoint capture reached the configured per-session limit.",
+                        message = "Checkpoint capture reached the configured per-recording-window limit.",
                         stage = "checkpoint",
                         url = web.url ?: "",
                         details = JSONObject().put("limit", MAX_CHECKPOINTS)
@@ -115,7 +115,7 @@ internal class CheckpointController(
                 record(
                     CaptureWarning.create(
                         code = "checkpoint_screenshot_limit_reached",
-                        message = "Checkpoint screenshots reached the configured per-session limit; later checkpoint state is still captured.",
+                        message = "Checkpoint screenshots reached the configured per-recording-window limit; later checkpoint state is still captured.",
                         stage = "checkpoint",
                         url = page,
                         details = JSONObject().put("limit", MAX_SCREENSHOTS)
