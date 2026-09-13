@@ -250,11 +250,12 @@ class WebResearchV10Activity : AppCompatActivity() {
             handler = uiHandler,
             record = { addRecord(windowRecord(it)) },
             onLoadingChanged = { isLoading ->
-                if (windowController.active()?.windowId != windowId) return@WebResearchWebViewController
-                loading = isLoading
-                if (!isLoading) editingAddress = false
-                updatePageAction()
-                progress.visibility = if (isLoading) View.VISIBLE else View.INVISIBLE
+                if (windowController.active()?.windowId == windowId) {
+                    loading = isLoading
+                    if (!isLoading) editingAddress = false
+                    updatePageAction()
+                    progress.visibility = if (isLoading) View.VISIBLE else View.INVISIBLE
+                }
             },
             onProgressChanged = { value ->
                 if (windowController.active()?.windowId == windowId) {
