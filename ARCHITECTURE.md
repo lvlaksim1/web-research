@@ -76,6 +76,20 @@ Forensic relations теперь извлекают JavaScript initiator из `in
 
 `checkpoints/index.json` описывает точки, а `checkpoint-diffs.json` содержит производные изменения cookies, storage и DOM между соседними checkpoints. Screenshot/state artifacts лежат в `checkpoints/<checkpointId>/`.
 
+## Advanced channels
+
+Этап 4 добавляет export-time инвентаризацию каналов, которые уже фиксируются разными слоями, и явно описывает недоступные WebView-поля вместо их имитации.
+
+`SessionManifestBuilder` формирует `advancedChannels`:
+
+- Service Worker registrations из full snapshot;
+- WebSocket и SSE event counters из raw-событий;
+- Performance / Long Task / Resource Timing / Navigation Timing coverage;
+- `sourceMappingURL` hints из хвоста архивированных JavaScript-файлов без повторной загрузки source map;
+- явную доступность DNS/TLS/certificate diagnostics.
+
+Dedicated/Shared Worker runtime не перехватывается путём переписывания URL worker-скриптов: такой подход менял бы execution path исследуемой страницы. DNS/TLS также не добываются через MITM/proxy. Эти ограничения экспортируются как `unavailable`, а не маскируются производными догадками.
+
 ## Browser / capture слой
 
 - `WebResearchV10Activity` — lifecycle и верхнеуровневая оркестрация браузера. Она связывает контроллеры, но не должна содержать большие UI-подсистемы или capture-алгоритмы.
