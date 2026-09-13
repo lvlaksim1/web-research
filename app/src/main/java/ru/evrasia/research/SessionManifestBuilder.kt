@@ -149,7 +149,7 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("sourceMapHintsAvailable", sourceMapHints > 0)
             .put("multiWindowContextCaptured", windowIds.isNotEmpty())
             .put("multiFrameContextCaptured", frameIds.isNotEmpty())
-            .put("crossOriginFrameSnapshotsCaptured", frameSnapshotArtifacts > 0)
+            .put("documentStartFrameSnapshotsCaptured", frameSnapshotArtifacts > 0)
 
         val counters = JSONObject()
             .put("rawEvents", archive.records.length())
