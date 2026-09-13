@@ -161,9 +161,6 @@ internal class BrowserWindowController(
         val entry = Entry(windowId, mainFrameId, web, openerWindowId, reason)
         entries[windowId] = entry
 
-        configure(web, windowId, mainFrameId)
-        installLinkMenu(web)
-
         record(
             JSONObject()
                 .put("source", "window-created")
@@ -174,6 +171,9 @@ internal class BrowserWindowController(
                 .put("creationReason", reason)
                 .put("isUserGesture", isUserGesture)
         )
+
+        configure(web, windowId, mainFrameId)
+        installLinkMenu(web)
         onCountChanged(entries.size)
         return entry
     }
