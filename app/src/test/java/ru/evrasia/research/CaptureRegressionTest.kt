@@ -197,6 +197,47 @@ class CaptureRegressionTest {
     }
 
     @Test
+    fun forensicCorrelationDoesNotCrossBrowsingWindows() {
+        val archive = ResearchArchive()
+        archive.addRecord(JSONObject()
+            .put("source", "user-action")
+            .put("time", 1_000L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-main")
+            .put("action", "click"))
+        archive.addRecord(JSONObject()
+            .put("source", "webview")
+            .put("time", 1_010L)
+            .put("windowId", "window-0001")
+            .put("method", "POST")
+            .put("url", "https://example.test/api"))
+        archive.addRecord(JSONObject()
+            .put("source", "webview")
+            .put("time", 1_020L)
+            .put("windowId", "window-0002")
+            .put("method", "POST")
+            .put("url", "https://example.test/api"))
+        archive.addRecord(JSONObject()
+            .put("source", "fetch")
+            .put("time", 1_030L)
+            .put("windowId", "window-0002")
+            .put("frameId", "frame-0002-main")
+            .put("method", "POST")
+            .put("url", "https://example.test/api")
+            .put("status", 200))
+
+        val action = archive.records.getJSONObject(0)
+        val webviewOne = archive.records.getJSONObject(1)
+        val webviewTwo = archive.records.getJSONObject(2)
+        val fetchTwo = archive.records.getJSONObject(3)
+
+        assertEquals(webviewTwo.getString("requestId"), fetchTwo.getString("requestId"))
+        assertFalse(fetchTwo.getString("requestId") == webviewOne.getString("requestId"))
+        assertFalse(fetchTwo.has("relatedActionId"))
+        assertTrue(action.has("actionId"))
+    }
+
+    @Test
     fun multiContextTimelineAndManifestPreserveWindowsAndFrames() {
         val archive = ResearchArchive()
         archive.addRecord(JSONObject()
