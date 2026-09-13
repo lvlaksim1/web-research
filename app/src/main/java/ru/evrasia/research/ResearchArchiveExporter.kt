@@ -32,6 +32,8 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
             add("session-manifest.json", SessionManifestBuilder(archive).build(pageUrl).toString(2).toByteArray(Charsets.UTF_8))
             add("timeline.json", ForensicTimelineExport.buildTimeline(archive).toString(2).toByteArray(Charsets.UTF_8))
             add("relations.json", ForensicTimelineExport.buildRelations(archive).toString(2).toByteArray(Charsets.UTF_8))
+            add("checkpoints/index.json", CheckpointExport.buildIndex(archive).toString(2).toByteArray(Charsets.UTF_8))
+            add("checkpoint-diffs.json", CheckpointExport.buildDiffs(archive).toString(2).toByteArray(Charsets.UTF_8))
             add("network.har", buildHar().toString(2).toByteArray(Charsets.UTF_8))
             add("api-summary.json", buildApiSummary().toString(2).toByteArray(Charsets.UTF_8))
             add("actions.json", buildSourceLog(setOf("user-action", "navigation", "form-submit", "history")).toString(2).toByteArray(Charsets.UTF_8))
@@ -66,7 +68,10 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
             }
             add("resources/manifest.json", resourceManifest.toString(2).toByteArray(Charsets.UTF_8))
 
-            extraArtifacts.entries.sortedBy { it.key }.forEach { add("browser/${safePath(it.key)}", it.value) }
+            extraArtifacts.entries.sortedBy { it.key }.forEach {
+                val path = if (it.key.startsWith("checkpoints/")) safePath(it.key) else "browser/${safePath(it.key)}"
+                add(path, it.value)
+            }
         }
     }
 
