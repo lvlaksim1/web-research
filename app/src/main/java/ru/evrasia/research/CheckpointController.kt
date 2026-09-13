@@ -36,6 +36,54 @@ internal class CheckpointController(
         screenshotLimitWarningSent = false
     }
 
+    fun captureNativeFallback(reason: String) {
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            val page = web.url.orEmpty()
+            val state = JSONObject()
+                .put("time", System.currentTimeMillis())
+                .put("reason", reason)
+                .put("url", page)
+                .put("title", web.title.orEmpty())
+                .put("cookie", "")
+                .put("localStorage", JSONObject().put("values", JSONObject()))
+                .put("sessionStorage", JSONObject().put("values", JSONObject()))
+                .put("viewport", JSONObject()
+                    .put("nativeWidth", web.width)
+                    .put("nativeHeight", web.height))
+                .put("focus", JSONObject())
+                .put("selection", JSONObject())
+                .put("dom", JSONObject()
+                    .put("total", 0)
+                    .put("captured", 0)
+                    .put("truncated", false)
+                    .put("elements", org.json.JSONArray()))
+                .put("frames", JSONObject()
+                    .put("total", 0)
+                    .put("captured", 0)
+                    .put("snapshots", 0)
+                    .put("truncated", false)
+                    .put("items", org.json.JSONArray()))
+                .put("shadowDom", JSONObject()
+                    .put("captured", 0)
+                    .put("truncated", false)
+                    .put("roots", org.json.JSONArray()))
+                .put("captureMode", "native-fallback")
+                .put("trigger", JSONObject().put("source", "native-fallback"))
+
+            record(
+                CaptureWarning.create(
+                    code = "checkpoint_browser_state_unavailable",
+                    message = "Browser checkpoint state was unavailable after retries; a native boundary fallback was captured.",
+                    stage = "checkpoint",
+                    url = page,
+                    details = JSONObject().put("reason", reason.take(80))
+                )
+            )
+            captureOnUi(reason, state)
+        }
+    }
+
     fun captureFromBrowser(reason: String, json: String) {
         if (json.length > MAX_STATE_CHARS) {
             record(
