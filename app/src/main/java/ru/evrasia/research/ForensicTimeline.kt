@@ -42,6 +42,7 @@ internal class ForensicTimeline(
     private val recentActions = ArrayDeque<ActionHint>()
     private val recentWebViewRequests = ArrayDeque<RequestHint>()
     private val recentApplicationRequests = ArrayDeque<RequestHint>()
+    private val browserActionTokens = LinkedHashMap<String, ActionHint>()
 
     @Synchronized
     fun annotate(record: JSONObject) {
@@ -62,7 +63,10 @@ internal class ForensicTimeline(
                     id("action", actionCounter)
                 }
                 record.put("actionId", actionId)
-                rememberAction(ActionHint(actionId, eventTime))
+                val hint = ActionHint(actionId, eventTime)
+                rememberAction(hint)
+                val token = record.optString("browserActionToken", "")
+                if (token.isNotBlank()) rememberBrowserAction(token, hint)
             }
 
             "webview" -> {
@@ -90,7 +94,7 @@ internal class ForensicTimeline(
                         url = comparableUrl(record.optString("url", ""))
                     )
                 )
-                linkNearestAction(record, eventTime)
+                if (!linkBrowserAction(record)) linkNearestAction(record, eventTime)
             }
 
             "resource-copy", "download" -> {
@@ -102,7 +106,7 @@ internal class ForensicTimeline(
                 if (record.optString("mutationId", "").isBlank()) {
                     record.put("mutationId", id("mutation", mutationCounter))
                 }
-                linkNearestAction(record, eventTime)
+                if (!linkBrowserAction(record)) linkNearestAction(record, eventTime)
                 nearestApplicationRequest(eventTime)?.let {
                     record.put("relatedRequestId", it.id)
                     record.put("requestRelation", "temporal-nearest")
@@ -158,6 +162,15 @@ internal class ForensicTimeline(
         return best
     }
 
+    private fun linkBrowserAction(record: JSONObject): Boolean {
+        val token = record.optString("browserActionToken", "")
+        if (token.isBlank()) return false
+        val action = browserActionTokens[token] ?: return false
+        record.put("relatedActionId", action.id)
+        record.put("actionRelation", "observed-browser-event-context")
+        return true
+    }
+
     private fun linkNearestAction(record: JSONObject, eventTime: Long) {
         val action = nearestAction(eventTime) ?: return
         record.put("relatedActionId", action.id)
@@ -187,6 +200,14 @@ internal class ForensicTimeline(
     private fun rememberAction(value: ActionHint) {
         recentActions.addLast(value)
         while (recentActions.size > MAX_RECENT_ACTIONS) recentActions.removeFirst()
+    }
+
+    private fun rememberBrowserAction(token: String, value: ActionHint) {
+        browserActionTokens[token] = value
+        while (browserActionTokens.size > MAX_RECENT_ACTIONS * 2) {
+            val first = browserActionTokens.keys.firstOrNull() ?: break
+            browserActionTokens.remove(first)
+        }
     }
 
     private fun rememberWebViewRequest(value: RequestHint) {
@@ -380,6 +401,7 @@ internal object ForensicTimelineExport {
         copyIfPresent(record, out, "requestRelation")
         copyIfPresent(record, out, "mutationId")
         copyIfPresent(record, out, "checkpointId")
+        copyIfPresent(record, out, "browserActionToken")
         copyIfPresent(record, out, "method")
         copyIfPresent(record, out, "url")
         copyIfPresent(record, out, "page")
