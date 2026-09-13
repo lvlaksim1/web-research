@@ -334,6 +334,19 @@ internal object ForensicTimelineExport {
                     window.put("lastTime", time)
                     if (record.has("url")) window.put("lastUrl", record.optString("url", ""))
                     if (source == "window-closed") window.put("closed", true)
+                    if (source == "window-created") {
+                        val relatedActionId = record.optString("relatedActionId", "")
+                        if (relatedActionId.isNotBlank()) {
+                            val relation = record.optString("actionRelation", "temporal-nearest")
+                            window.put("createdByActionId", relatedActionId)
+                            window.put("actionRelation", relation)
+                            addLink(links, linkKeys, relatedActionId, windowId, "action-to-window", relation)
+                        }
+                        val openerWindowId = record.optString("openerWindowId", "")
+                        if (openerWindowId.isNotBlank()) {
+                            addLink(links, linkKeys, openerWindowId, windowId, "window-to-window", "observed-opener")
+                        }
+                    }
                 }
                 if (frameId.isNotBlank()) {
                     val frame = frames.getOrPut(frameId) {
@@ -351,6 +364,9 @@ internal object ForensicTimelineExport {
                     frame.put("lastEventId", eventId)
                     frame.put("lastTime", time)
                     if (record.has("url")) frame.put("lastUrl", record.optString("url", ""))
+                    if (windowId.isNotBlank()) {
+                        addLink(links, linkKeys, windowId, frameId, "window-to-frame", "observed-browsing-context")
+                    }
                 }
 
                 record.optString("actionId", "").takeIf { it.isNotBlank() }?.let { actionId ->
@@ -516,6 +532,14 @@ internal object ForensicTimelineExport {
                     .put(
                         "observed-browser-event-context",
                         "same browser action context token was observed by both events"
+                    )
+                    .put(
+                        "observed-opener",
+                        "native WebView window lifecycle directly identified the opener window"
+                    )
+                    .put(
+                        "observed-browsing-context",
+                        "event was ingested through a recorder bound to the stated window/frame context"
                     )
             )
             .put("windows", JSONArray(windows.values.toList()))
