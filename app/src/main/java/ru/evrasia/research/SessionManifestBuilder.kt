@@ -8,11 +8,23 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         val sourceCounts = linkedMapOf<String, Int>()
         val warningCodeCounts = linkedMapOf<String, Int>()
         val rawWarnings = JSONArray()
+        var eventIds = 0
+        var actionIds = 0
+        var requestIds = 0
+        var mutationIds = 0
+        var relatedActions = 0
+        var relatedRequests = 0
         synchronized(archive) {
             for (index in 0 until archive.records.length()) {
                 val record = archive.records.optJSONObject(index) ?: continue
                 val source = record.optString("source", "").ifBlank { "unknown" }
                 sourceCounts[source] = (sourceCounts[source] ?: 0) + 1
+                if (record.optString("eventId", "").isNotBlank()) eventIds++
+                if (record.optString("actionId", "").isNotBlank()) actionIds++
+                if (record.optString("requestId", "").isNotBlank()) requestIds++
+                if (record.optString("mutationId", "").isNotBlank()) mutationIds++
+                if (record.optString("relatedActionId", "").isNotBlank()) relatedActions++
+                if (record.optString("relatedRequestId", "").isNotBlank()) relatedRequests++
                 if (source == "capture-warning") {
                     val code = record.optString("code", "capture_warning")
                     warningCodeCounts[code] = (warningCodeCounts[code] ?: 0) + 1
@@ -108,6 +120,20 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("cacheStorageArtifacts", cacheStorageArtifacts)
             .put("scriptRedirectArtifacts", scriptRedirectArtifacts)
             .put("warnings", warnings.length())
+            .put("forensicEventIds", eventIds)
+            .put("forensicActionIds", actionIds)
+            .put("forensicRequestIds", requestIds)
+            .put("forensicMutationIds", mutationIds)
+            .put("forensicRelatedActions", relatedActions)
+            .put("forensicRelatedRequests", relatedRequests)
+
+        val forensic = JSONObject()
+            .put("sessionId", archive.forensicSessionId)
+            .put("sessionStartedAt", archive.forensicSessionStartedAtMs)
+            .put("timelineFormat", "web-research-forensic-timeline-v1")
+            .put("relationsFormat", "web-research-forensic-relations-v1")
+            .put("allRawEventsHaveEventId", eventIds == archive.records.length())
+            .put("relationPolicy", "temporal-nearest links are inferred, not proof of JavaScript causality")
 
         val limits = JSONObject()
             .put("cacheRequestsPerCache", 250)
@@ -125,6 +151,7 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("page", pageUrl)
             .put("counters", counters)
             .put("completeness", completeness)
+            .put("forensic", forensic)
             .put("limits", limits)
             .put("warnings", warnings)
     }

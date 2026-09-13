@@ -20,6 +20,56 @@ class CaptureRegressionTest {
     }
 
     @Test
+    fun forensicTimelineAssignsIdsAndBuildsTransparentTemporalRelations() {
+        val archive = ResearchArchive()
+        archive.addRecord(JSONObject()
+            .put("source", "user-action")
+            .put("time", 1_000L)
+            .put("action", "click")
+            .put("page", "https://example.test/app"))
+        archive.addRecord(JSONObject()
+            .put("source", "webview")
+            .put("time", 1_020L)
+            .put("method", "POST")
+            .put("url", "https://example.test/api/save"))
+        archive.addRecord(JSONObject()
+            .put("source", "fetch")
+            .put("time", 1_018L)
+            .put("duration", 120L)
+            .put("method", "POST")
+            .put("url", "https://example.test/api/save")
+            .put("status", 200))
+        archive.addRecord(JSONObject()
+            .put("source", "dom-mutation")
+            .put("time", 1_300L)
+            .put("page", "https://example.test/app"))
+
+        val action = archive.records.getJSONObject(0)
+        val webview = archive.records.getJSONObject(1)
+        val fetch = archive.records.getJSONObject(2)
+        val mutation = archive.records.getJSONObject(3)
+
+        assertTrue(action.getString("eventId").startsWith("event-"))
+        assertTrue(action.getString("actionId").startsWith("action-"))
+        assertEquals(webview.getString("requestId"), fetch.getString("requestId"))
+        assertEquals(action.getString("actionId"), fetch.getString("relatedActionId"))
+        assertEquals(fetch.getString("requestId"), mutation.getString("relatedRequestId"))
+        assertEquals("temporal-nearest", mutation.getString("requestRelation"))
+        assertTrue(mutation.getString("mutationId").startsWith("mutation-"))
+        assertEquals(4L, mutation.getLong("sequence"))
+        assertTrue(mutation.getLong("monotonicUs") >= 0L)
+
+        val timeline = ForensicTimelineExport.buildTimeline(archive)
+        assertEquals(4, timeline.getJSONArray("events").length())
+        val relations = ForensicTimelineExport.buildRelations(archive)
+        assertEquals(1, relations.getJSONArray("actions").length())
+        assertEquals(1, relations.getJSONArray("requests").length())
+        assertEquals(1, relations.getJSONArray("mutations").length())
+        assertTrue(relations.getJSONArray("links").length() >= 2)
+        assertTrue(relations.getJSONObject("relationPolicy").getString("temporal-nearest").contains("not proof"))
+    }
+
+    @Test
     fun rawRecordIsNotMutatedByDebuggerNormalization() {
         val raw = JSONArray()
         val record = JSONObject()
@@ -174,7 +224,7 @@ class CaptureRegressionTest {
         val archive = ResearchArchive()
         val events = fixture.getJSONArray("events")
         for (index in 0 until events.length()) {
-            archive.records.put(JSONObject(events.getJSONObject(index).toString()))
+            archive.addRecord(JSONObject(events.getJSONObject(index).toString()))
         }
         archive.updateSnapshot(JSONObject().put("html", "<html><body>fixture</body></html>"))
         archive.putScript("https://example.test/app.js", "console.log('fixture')".toByteArray())
@@ -191,6 +241,8 @@ class CaptureRegressionTest {
 
         val required = setOf(
             "session-manifest.json",
+            "timeline.json",
+            "relations.json",
             "raw-events.json",
             "network.har",
             "api-summary.json",
@@ -206,7 +258,13 @@ class CaptureRegressionTest {
         )
         assertTrue(entries.keys.containsAll(required))
         val raw = JSONObject(entries.getValue("raw-events.json").toString(Charsets.UTF_8))
+        assertEquals("evrasia-research-v5", raw.getString("format"))
         assertEquals(events.length(), raw.getJSONArray("records").length())
+        assertTrue(raw.getJSONArray("records").getJSONObject(0).has("eventId"))
+        val timeline = JSONObject(entries.getValue("timeline.json").toString(Charsets.UTF_8))
+        assertEquals(events.length(), timeline.getJSONArray("events").length())
+        val relations = JSONObject(entries.getValue("relations.json").toString(Charsets.UTF_8))
+        assertEquals(archive.forensicSessionId, relations.getString("sessionId"))
         val har = JSONObject(entries.getValue("network.har").toString(Charsets.UTF_8))
         assertTrue(har.getJSONObject("log").getJSONArray("entries").length() >= 3)
         val manifest = JSONObject(entries.getValue("session-manifest.json").toString(Charsets.UTF_8))
@@ -215,6 +273,8 @@ class CaptureRegressionTest {
         assertEquals(1, manifest.getJSONObject("counters").getInt("scriptsArchived"))
         assertEquals(1, manifest.getJSONObject("counters").getInt("resourcesArchived"))
         assertEquals(1, manifest.getJSONObject("counters").getInt("browserArtifacts"))
+        assertEquals(events.length(), manifest.getJSONObject("counters").getInt("forensicEventIds"))
+        assertTrue(manifest.getJSONObject("forensic").getBoolean("allRawEventsHaveEventId"))
         assertTrue(manifest.getJSONObject("completeness").getBoolean("pageHtmlCaptured"))
         assertFalse(manifest.getJSONObject("completeness").getBoolean("fullSnapshotCaptured"))
         assertTrue(

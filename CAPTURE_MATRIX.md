@@ -24,6 +24,7 @@
 | JS errors | window error / unhandledrejection / console | message, source, line/column, console level | raw `js-error`, `promise-rejection`, `console` | raw | stack зависит от браузера/события |
 | Downloads | WebView DownloadListener | URL, suggested filename, MIME, content length, DownloadManager id/status | raw `download` | raw | файл скачивается Android DownloadManager отдельно; его bytes не встраиваются автоматически в research ZIP |
 | Browser mode | native controller | mobile/desktop mode, UA, viewport result | raw `browser-mode`, `desktop-viewport` | raw | служебное состояние сессии |
+| Forensic timeline | capture-side IDs + export-time projection | eventId/sequence, monotonic time, actionId, requestId, mutationId, temporal relations | raw metadata + derivative timeline/relations | `timeline.json`, `relations.json`, IDs также остаются в raw | temporal-nearest связи явно маркируются как inferred и не считаются доказанной JS-causality |
 | Session manifest | export-time aggregation | raw/source counters, artifact counters, snapshot completeness indicators, observed warnings, explicit capture limits | derivative export metadata | `session-manifest.json` | не является новым источником трафика и не подменяет raw evidence |
 | Capture warnings | native capture + browser instrumentation | точная причина, этап, URL/артефакт и metadata фактической потери/усечения | raw `capture-warning` | `raw-events.json` + сводка в `session-manifest.json` | warning фиксируется только при реально наблюдаемой ошибке или срабатывании лимита |
 

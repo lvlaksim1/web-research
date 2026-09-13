@@ -4,7 +4,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
-class ResearchArchive {
+class ResearchArchive internal constructor(
+    sessionId: String = java.util.UUID.randomUUID().toString(),
+    sessionStartedAtMs: Long = System.currentTimeMillis()
+) {
+    private var forensicTimeline = ForensicTimeline(sessionId, sessionStartedAtMs)
+    internal val forensicSessionId: String get() = forensicTimeline.sessionId
+    internal val forensicSessionStartedAtMs: Long get() = forensicTimeline.sessionStartedAtMs
     val records = JSONArray()
     val scripts = ConcurrentHashMap<String, ByteArray>()
     val scriptErrors = ConcurrentHashMap<String, String>()
@@ -21,6 +27,7 @@ class ResearchArchive {
     @Volatile var snapshot = JSONObject()
 
     @Synchronized fun addRecord(record: JSONObject) {
+        forensicTimeline.annotate(record)
         NetworkRecordPipeline.appendRawAndDebug(records, record)
         recordCapturedAt.add(System.currentTimeMillis())
     }
@@ -69,7 +76,7 @@ class ResearchArchive {
     }
 
     @Synchronized fun snapshotWindow(startedAt: Long, endedAt: Long): ResearchArchive {
-        val out = ResearchArchive()
+        val out = ResearchArchive(forensicTimeline.sessionId, forensicTimeline.sessionStartedAtMs)
         for (index in 0 until records.length()) {
             val capturedAt = recordCapturedAt.getOrNull(index) ?: continue
             if (capturedAt in startedAt..endedAt) {
@@ -121,6 +128,7 @@ class ResearchArchive {
         artifactCapturedAt.clear()
         snapshotCapturedAt = 0L
         snapshot = JSONObject()
+        forensicTimeline = ForensicTimeline()
         NetworkRecordPipeline.clearDebugger()
     }
 

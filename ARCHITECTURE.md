@@ -34,6 +34,20 @@ debugger projection / display
 
 `NetworkRecordPipeline` делает отдельную JSON-копию для debugger-а. Нормализация headers, корреляция, merge, фильтрация и display transformations не должны менять объект, уже помещённый в `ResearchArchive.records`.
 
+## Forensic Timeline
+
+Над raw capture работает отдельный capture-side слой `ForensicTimeline`. До помещения события в `ResearchArchive.records` он добавляет только forensic metadata, не переписывая наблюдённые поля события:
+
+- стабильный `eventId` и `sequence` для каждого raw event;
+- `capturedAt` и монотонный `monotonicUs`;
+- `actionId` для действий пользователя;
+- `requestId` для сетевых событий с корреляцией WebView ↔ fetch/XHR по method+URL+времени;
+- `mutationId` для DOM mutation events;
+- зарезервированный namespace `checkpointId` для следующего этапа checkpoints;
+- явно маркированные `relatedActionId` / `relatedRequestId` с методом `temporal-nearest`.
+
+В ZIP эти данные дополнительно представлены как производные `timeline.json` и `relations.json`. Временная корреляция является inference и не выдаётся за доказанную JavaScript-causality; точная причинность относится к отдельному следующему слою.
+
 ## Browser / capture слой
 
 - `WebResearchV10Activity` — lifecycle и верхнеуровневая оркестрация браузера. Она связывает контроллеры, но не должна содержать большие UI-подсистемы или capture-алгоритмы.
@@ -63,6 +77,8 @@ debugger projection / display
 `ResearchArchiveExporter` является отдельным read/export слоем и строит:
 
 - `session-manifest.json`;
+- `timeline.json` — компактная хронология forensic events без тяжёлых bodies;
+- `relations.json` — производные action/request/mutation связи и уровень доказательности;
 - `raw-events.json`;
 - `network.har`;
 - `api-summary.json`;

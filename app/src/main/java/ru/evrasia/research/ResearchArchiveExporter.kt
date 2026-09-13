@@ -30,6 +30,8 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
             }
 
             add("session-manifest.json", SessionManifestBuilder(archive).build(pageUrl).toString(2).toByteArray(Charsets.UTF_8))
+            add("timeline.json", ForensicTimelineExport.buildTimeline(archive).toString(2).toByteArray(Charsets.UTF_8))
+            add("relations.json", ForensicTimelineExport.buildRelations(archive).toString(2).toByteArray(Charsets.UTF_8))
             add("network.har", buildHar().toString(2).toByteArray(Charsets.UTF_8))
             add("api-summary.json", buildApiSummary().toString(2).toByteArray(Charsets.UTF_8))
             add("actions.json", buildSourceLog(setOf("user-action", "navigation", "form-submit", "history")).toString(2).toByteArray(Charsets.UTF_8))
@@ -37,7 +39,7 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
             add("realtime.json", buildSourceLog(setOf("websocket-open", "websocket-state", "websocket-send", "websocket-receive", "sse-open", "sse-state", "sse-message")).toString(2).toByteArray(Charsets.UTF_8))
             add("performance.json", buildSourceLog(setOf("performance", "long-task", "resource-timing", "navigation-timing")).toString(2).toByteArray(Charsets.UTF_8))
             add("raw-events.json", JSONObject()
-                .put("format", "evrasia-research-v4")
+                .put("format", "evrasia-research-v5")
                 .put("exportedAt", System.currentTimeMillis())
                 .put("page", pageUrl)
                 .put("records", records)
@@ -200,12 +202,15 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
                     .put("response", response)
                     .put("cache", JSONObject())
                     .put("timings", JSONObject().put("send", 0).put("wait", r.optLong("duration", 0)).put("receive", 0))
-                    .put("_evrasiaSource", r.optString("source", "unknown")))
+                    .put("_evrasiaSource", r.optString("source", "unknown"))
+                    .put("_eventId", r.optString("eventId", ""))
+                    .put("_requestId", r.optString("requestId", ""))
+                    .put("_relatedActionId", r.optString("relatedActionId", "")))
             }
         }
         return JSONObject().put("log", JSONObject()
             .put("version", "1.2")
-            .put("creator", JSONObject().put("name", "Evrasia Research").put("version", "4"))
+            .put("creator", JSONObject().put("name", "Evrasia Research").put("version", "5"))
             .put("pages", JSONArray())
             .put("entries", entries))
     }
