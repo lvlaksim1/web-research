@@ -121,7 +121,7 @@ internal object WebResearchScripts {
           })();
         """.trimIndent()
 
-    fun fullSnapshot(nativeCookies: String): String = """
+    fun fullSnapshot(nativeCookies: String, requestId: String = ""): String = """
           (async function(){
             const send=o=>{try{EvrasiaResearch.record(JSON.stringify(o))}catch(e){}};
             const warn=(code,message,stage,extra)=>send(Object.assign({source:'capture-warning',time:Date.now(),code:code,message:message,stage:stage,url:location.href},extra||{}));
@@ -137,7 +137,7 @@ internal object WebResearchScripts {
             const elements=allElements.slice(0,10000).map(e=>({tag:e.tagName.toLowerCase(),attrs:attrs(e),text:(e.innerText||e.textContent||'').trim().slice(0,500)}));
             const resources=performance.getEntriesByType('resource').map(r=>({name:r.name,initiatorType:r.initiatorType,startTime:r.startTime,duration:r.duration,transferSize:r.transferSize,encodedBodySize:r.encodedBodySize,decodedBodySize:r.decodedBodySize}));
             let runtimeUi={};try{runtimeUi=window.__WR_RUNTIME_UI_STATE?window.__WR_RUNTIME_UI_STATE():{}}catch(e){runtimeUi={error:String(e)};warn('runtime_ui_snapshot_failed','Runtime UI state could not be captured.','runtime-ui',{error:String(e)})}
-            try{EvrasiaResearch.snapshot(JSON.stringify({time:Date.now(),url:location.href,title:document.title,cookie:document.cookie,nativeCookie:${JSONObject.quote(nativeCookies)},localStorage:store(localStorage,'localStorage'),sessionStorage:store(sessionStorage,'sessionStorage'),serviceWorkers:sw,cacheStorage:cacheNames,indexedDB:db,resources:resources,elements:elements,runtimeUi:runtimeUi,html:document.documentElement.outerHTML,fullSnapshot:true}))}catch(e){warn('snapshot_delivery_failed','The full page snapshot could not be delivered to the native archive.','snapshot',{error:String(e)})}
+            try{EvrasiaResearch.snapshot(JSON.stringify({time:Date.now(),snapshotRequestId:${JSONObject.quote(requestId)},url:location.href,title:document.title,cookie:document.cookie,nativeCookie:${JSONObject.quote(nativeCookies)},localStorage:store(localStorage,'localStorage'),sessionStorage:store(sessionStorage,'sessionStorage'),serviceWorkers:sw,cacheStorage:cacheNames,indexedDB:db,resources:resources,elements:elements,runtimeUi:runtimeUi,html:document.documentElement.outerHTML,fullSnapshot:true}))}catch(e){warn('snapshot_delivery_failed','The full page snapshot could not be delivered to the native archive.','snapshot',{error:String(e)})}
           })();
         """.trimIndent()
 }

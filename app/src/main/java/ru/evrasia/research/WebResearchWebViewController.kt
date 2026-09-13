@@ -31,7 +31,9 @@ internal class WebResearchWebViewController(
     private val record: (JSONObject) -> Unit,
     private val onLoadingChanged: (Boolean) -> Unit,
     private val onProgressChanged: (Int) -> Unit,
-    private val onPageUrlChanged: (String) -> Unit
+    private val onPageUrlChanged: (String) -> Unit,
+    private val onCreateWindowRequested: (WebView, Boolean, Boolean, Message) -> Boolean,
+    private val onCloseWindowRequested: (WebView) -> Unit
 ) {
     private var mobileUserAgent = ""
     private var desktopUserAgent = ""
@@ -55,17 +57,11 @@ internal class WebResearchWebViewController(
                 return true
             }
             override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
-                if (resultMsg == null) return false
-                val temp = WebView(activity)
-                temp.settings.javaScriptEnabled = true
-                temp.webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean { navigationController.openInActiveWindow(request.url.toString()); temp.destroy(); return true }
-                    override fun onPageStarted(v: WebView, url: String, favicon: Bitmap?) { if (url != "about:blank") { navigationController.openInActiveWindow(url); temp.stopLoading(); temp.destroy() } }
-                }
-                val transport = resultMsg.obj as WebView.WebViewTransport
-                transport.webView = temp
-                resultMsg.sendToTarget()
-                return true
+                if (view == null || resultMsg == null) return false
+                return onCreateWindowRequested(view, isDialog, isUserGesture, resultMsg)
+            }
+            override fun onCloseWindow(window: WebView) {
+                onCloseWindowRequested(window)
             }
         }
 

@@ -5,12 +5,15 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 internal class WebCaptureController(
     private val activity: AppCompatActivity,
     private val web: WebView,
     private val archive: ResearchArchive,
+    private val windowId: String,
+    private val mainFrameId: String,
     userAgent: String,
     private val record: (JSONObject) -> Unit,
     private val onChanged: () -> Unit,
@@ -18,27 +21,45 @@ internal class WebCaptureController(
 ) {
     private val scriptChunks = ConcurrentHashMap<String, MutableMap<Int, String>>()
     private val artifactChunks = ConcurrentHashMap<String, MutableMap<Int, String>>()
+    private val snapshotCallbacks = ConcurrentHashMap<String, () -> Unit>()
     private val resourceCapture = WebResourceCapture(
         archive = archive,
         userAgent = userAgent,
-        record = record,
+        record = { emitWindow(it) },
         onChanged = onChanged
     )
     private val checkpointController = CheckpointController(
         activity = activity,
         web = web,
         archive = archive,
-        record = record,
+        windowId = windowId,
+        mainFrameId = mainFrameId,
+        record = { emitMain(it) },
+        onChanged = onChanged
+    )
+    private val frameCaptureController = FrameCaptureController(
+        web = web,
+        windowId = windowId,
+        mainFrameId = mainFrameId,
+        archive = archive,
+        record = { emitWindow(it) },
         onChanged = onChanged
     )
 
     val bridge = Bridge()
+
+    fun installFrameCapture() {
+        frameCaptureController.install()
+    }
+
+    fun frameCaptureMode(): String = frameCaptureController.mode
 
     fun clearPending() {
         resourceCapture.clearPending()
         checkpointController.reset()
         scriptChunks.clear()
         artifactChunks.clear()
+        snapshotCallbacks.clear()
     }
 
     fun updateUserAgent(userAgent: String) {
@@ -46,6 +67,8 @@ internal class WebCaptureController(
     }
 
     fun shutdown() {
+        snapshotCallbacks.clear()
+        frameCaptureController.shutdown()
         resourceCapture.shutdown()
     }
 
@@ -68,9 +91,14 @@ internal class WebCaptureController(
         web.evaluateJavascript(WebResearchScripts.lightSnapshot(nativeCookies), null)
     }
 
-    fun capturePageSnapshot() {
+    fun capturePageSnapshot(onComplete: (() -> Unit)? = null) {
         val nativeCookies = CookieManager.getInstance().getCookie(web.url ?: "") ?: ""
-        web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies), null)
+        val requestId = if (onComplete != null) UUID.randomUUID().toString() else ""
+        if (onComplete != null) {
+            snapshotCallbacks[requestId] = onComplete
+            web.postDelayed({ snapshotCallbacks.remove(requestId) }, 6_000L)
+        }
+        web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies, requestId), null)
     }
 
     fun resetCheckpointWindow() {
@@ -94,55 +122,90 @@ internal class WebCaptureController(
     }
 
     inner class Bridge {
-        @JavascriptInterface fun record(json: String) {
+        @JavascriptInterface
+        fun record(json: String) {
             try {
-                record(JSONObject(json))
+                emitMain(JSONObject(json))
             } catch (e: Exception) {
-                record(CaptureWarning.create(
-                    code = "bridge_record_parse_failed",
-                    message = "A browser-side event could not be parsed and was omitted.",
-                    stage = "js-bridge",
-                    error = e.toString(),
-                    details = JSONObject().put("payloadChars", json.length)
-                ))
+                emitMain(
+                    CaptureWarning.create(
+                        code = "bridge_record_parse_failed",
+                        message = "A browser-side event could not be parsed and was omitted.",
+                        stage = "js-bridge",
+                        error = e.toString(),
+                        details = JSONObject().put("payloadChars", json.length)
+                    )
+                )
             }
         }
 
-        @JavascriptInterface fun snapshot(json: String) {
+        @JavascriptInterface
+        fun snapshot(json: String) {
             try {
-                archive.updateSnapshot(JSONObject(json))
+                val snapshot = JSONObject(json)
+                    .put("windowId", windowId)
+                    .put("frameId", mainFrameId)
+                archive.updateSnapshot(snapshot)
+                archive.putArtifact(
+                    "windows/$windowId/page-snapshot.json",
+                    snapshot.toString(2).toByteArray(Charsets.UTF_8)
+                )
                 onSnapshot()
+                onChanged()
+                val requestId = snapshot.optString("snapshotRequestId", "")
+                if (requestId.isNotBlank()) {
+                    snapshotCallbacks.remove(requestId)?.let { callback ->
+                        activity.runOnUiThread { callback() }
+                    }
+                }
             } catch (e: Exception) {
-                record(CaptureWarning.create(
-                    code = "snapshot_parse_failed",
-                    message = "The page snapshot could not be parsed and was omitted.",
-                    stage = "snapshot",
-                    url = web.url ?: "",
-                    error = e.toString(),
-                    details = JSONObject().put("payloadChars", json.length)
-                ))
+                emitMain(
+                    CaptureWarning.create(
+                        code = "snapshot_parse_failed",
+                        message = "The page snapshot could not be parsed and was omitted.",
+                        stage = "snapshot",
+                        url = web.url ?: "",
+                        error = e.toString(),
+                        details = JSONObject().put("payloadChars", json.length)
+                    )
+                )
             }
         }
 
-        @JavascriptInterface fun checkpoint(reason: String, json: String) {
+        @JavascriptInterface
+        fun checkpoint(reason: String, json: String) {
             checkpointController.captureFromBrowser(reason, json)
         }
 
-        @JavascriptInterface fun externalScript(url: String) {
+        @JavascriptInterface
+        fun externalScript(url: String) {
             if (url.isNotBlank()) resourceCapture.captureExternalScript(url, emptyMap())
         }
 
-        @JavascriptInterface fun requestSnapshot() {
+        @JavascriptInterface
+        fun requestSnapshot() {
             activity.runOnUiThread { capturePageSnapshot() }
         }
 
-        @JavascriptInterface fun scriptChunk(url: String, index: Int, total: Int, chunk: String) {
+        @JavascriptInterface
+        fun scriptChunk(url: String, index: Int, total: Int, chunk: String) {
             collectChunk(url, index, total, chunk, true)
         }
 
-        @JavascriptInterface fun artifactChunk(key: String, index: Int, total: Int, chunk: String) {
-            collectChunk(key, index, total, chunk, false)
+        @JavascriptInterface
+        fun artifactChunk(key: String, index: Int, total: Int, chunk: String) {
+            collectChunk("windows/$windowId/$key", index, total, chunk, false)
         }
+    }
+
+    private fun emitWindow(value: JSONObject) {
+        if (!value.has("windowId")) value.put("windowId", windowId)
+        record(value)
+    }
+
+    private fun emitMain(value: JSONObject) {
+        if (!value.has("frameId")) value.put("frameId", mainFrameId)
+        emitWindow(value)
     }
 
     private fun collectChunk(key: String, index: Int, total: Int, chunk: String, script: Boolean) {
@@ -150,13 +213,15 @@ internal class WebCaptureController(
         if (total <= 0 || index !in 0 until total) {
             val message = "An invalid chunk index was received; the artifact cannot be reconstructed."
             if (script) archive.putScriptError(key, message)
-            record(CaptureWarning.create(
-                code = "chunk_invalid_index",
-                message = message,
-                stage = stage,
-                artifact = key,
-                details = JSONObject().put("index", index).put("total", total).put("chunkChars", chunk.length)
-            ))
+            emitMain(
+                CaptureWarning.create(
+                    code = "chunk_invalid_index",
+                    message = message,
+                    stage = stage,
+                    artifact = key,
+                    details = JSONObject().put("index", index).put("total", total).put("chunkChars", chunk.length)
+                )
+            )
             return
         }
         try {
@@ -176,14 +241,16 @@ internal class WebCaptureController(
             }
         } catch (e: Exception) {
             if (script) archive.putScriptError(key, e.toString())
-            record(CaptureWarning.create(
-                code = "chunk_assembly_failed",
-                message = "A chunked browser artifact could not be reconstructed.",
-                stage = stage,
-                artifact = key,
-                error = e.toString(),
-                details = JSONObject().put("index", index).put("total", total).put("chunkChars", chunk.length)
-            ))
+            emitMain(
+                CaptureWarning.create(
+                    code = "chunk_assembly_failed",
+                    message = "A chunked browser artifact could not be reconstructed.",
+                    stage = stage,
+                    artifact = key,
+                    error = e.toString(),
+                    details = JSONObject().put("index", index).put("total", total).put("chunkChars", chunk.length)
+                )
+            )
         }
     }
 }

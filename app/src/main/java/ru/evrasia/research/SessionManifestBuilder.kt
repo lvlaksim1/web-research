@@ -14,6 +14,10 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         var mutationIds = 0
         var relatedActions = 0
         var relatedRequests = 0
+        val windowIds = linkedSetOf<String>()
+        val frameIds = linkedSetOf<String>()
+        val modernFrameWindows = linkedSetOf<String>()
+        val legacyFrameWindows = linkedSetOf<String>()
         synchronized(archive) {
             for (index in 0 until archive.records.length()) {
                 val record = archive.records.optJSONObject(index) ?: continue
@@ -25,6 +29,15 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
                 if (record.optString("mutationId", "").isNotBlank()) mutationIds++
                 if (record.optString("relatedActionId", "").isNotBlank()) relatedActions++
                 if (record.optString("relatedRequestId", "").isNotBlank()) relatedRequests++
+                record.optString("windowId", "").takeIf { it.isNotBlank() }?.let { windowIds.add(it) }
+                record.optString("frameId", "").takeIf { it.isNotBlank() }?.let { frameIds.add(it) }
+                if (source == "frame-capture-mode") {
+                    val id = record.optString("windowId", "")
+                    when (record.optString("mode", "")) {
+                        "modern" -> if (id.isNotBlank()) modernFrameWindows.add(id)
+                        "legacy" -> if (id.isNotBlank()) legacyFrameWindows.add(id)
+                    }
+                }
                 if (source == "capture-warning") {
                     val code = record.optString("code", "capture_warning")
                     warningCodeCounts[code] = (warningCodeCounts[code] ?: 0) + 1
@@ -53,12 +66,14 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         }
 
         val metadataOnly = archive.resourceMeta.keys.count { !archive.resources.containsKey(it) }
-        val indexedDbArtifacts = archive.extraArtifacts.keys.count { it.startsWith("indexeddb-") }
-        val cacheStorageArtifacts = archive.extraArtifacts.keys.count { it.startsWith("cache-") }
+        val indexedDbArtifacts = archive.extraArtifacts.keys.count { it.startsWith("indexeddb-") || it.contains("/indexeddb-") }
+        val cacheStorageArtifacts = archive.extraArtifacts.keys.count { it.startsWith("cache-") || it.contains("/cache-") }
         val scriptRedirectArtifacts = archive.extraArtifacts.keys.count { it.startsWith("script-redirect-") }
         val checkpointStateArtifacts = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/state.json") }
         val checkpointScreenshots = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/screenshot.jpg") }
         val checkpointEvents = sourceCounts["checkpoint"] ?: 0
+        val frameSnapshotArtifacts = archive.extraArtifacts.keys.count { it.startsWith("frames/") && it.endsWith(".json") }
+        val windowSnapshotArtifacts = archive.extraArtifacts.keys.count { it.startsWith("windows/") && it.endsWith("/page-snapshot.json") }
         val advancedChannels = buildAdvancedChannels(snapshot, sourceCounts)
         val sourceMapHints = advancedChannels.getJSONObject("sourceMaps").optInt("count", 0)
         val serviceWorkerRegistrations = advancedChannels.getJSONObject("serviceWorkers").optInt("count", 0)
@@ -132,6 +147,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("checkpointDiffsAvailable", checkpointEvents > 1)
             .put("advancedChannelSummaryAvailable", true)
             .put("sourceMapHintsAvailable", sourceMapHints > 0)
+            .put("multiWindowContextCaptured", windowIds.isNotEmpty())
+            .put("multiFrameContextCaptured", frameIds.isNotEmpty())
+            .put("documentStartFrameSnapshotsCaptured", frameSnapshotArtifacts > 0)
 
         val counters = JSONObject()
             .put("rawEvents", archive.records.length())
@@ -169,6 +187,12 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("forensicMutationIds", mutationIds)
             .put("forensicRelatedActions", relatedActions)
             .put("forensicRelatedRequests", relatedRequests)
+            .put("windowCount", windowIds.size)
+            .put("forensicFrameCount", frameIds.size)
+            .put("frameSnapshotArtifacts", frameSnapshotArtifacts)
+            .put("windowSnapshotArtifacts", windowSnapshotArtifacts)
+            .put("modernFrameCaptureWindows", modernFrameWindows.size)
+            .put("legacyFrameCaptureWindows", legacyFrameWindows.size)
 
         val forensic = JSONObject()
             .put("sessionId", archive.forensicSessionId)
@@ -207,6 +231,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("frameShadowElementsPerRoot", 40)
             .put("frameShadowHtmlCharsPerRoot", 5000)
             .put("sourceMapHints", 200)
+            .put("isolatedFrameSnapshotsPerDocument", 20)
+            .put("isolatedFrameDomElements", 300)
+            .put("frameNetworkBodyChars", 500000)
 
         return JSONObject()
             .put("schemaVersion", 1)
@@ -224,6 +251,22 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
                 .put("openShadowRoots", shadowRootCount)
                 .put("closedShadowRoots", "unavailable-without-invasive-attachShadow-interception"))
             .put("advancedChannels", advancedChannels)
+            .put("browsingContexts", JSONObject()
+                .put("windows", windowIds.size)
+                .put("frames", frameIds.size)
+                .put("windowSnapshots", windowSnapshotArtifacts)
+                .put("frameSnapshots", frameSnapshotArtifacts)
+                .put("frameCaptureMode", when {
+                    modernFrameWindows.isNotEmpty() && legacyFrameWindows.isEmpty() -> "modern"
+                    modernFrameWindows.isNotEmpty() && legacyFrameWindows.isNotEmpty() -> "mixed"
+                    legacyFrameWindows.isNotEmpty() -> "legacy"
+                    else -> "unobserved"
+                })
+                .put("modernWindows", modernFrameWindows.size)
+                .put("legacyWindows", legacyFrameWindows.size)
+                .put("feature", "JS_INJECTION_IN_FRAME_AND_WORLD")
+                .put("frameIdentityMethod", "sourceOrigin+url+performance.timeOrigin+window.name+topFlag")
+                .put("parentFrameRelation", "unavailable-via-current-webview-api"))
             .put("limits", limits)
             .put("warnings", warnings)
     }

@@ -194,6 +194,110 @@ class CaptureRegressionTest {
         assertTrue(script.contains("return window.__WR_CAPTURE_CHECKPOINT"))
         assertTrue(script.contains("return true"))
         assertTrue(script.contains("return false"))
+
+        val fullSnapshot = WebResearchScripts.fullSnapshot("", "snapshot-request-1")
+        assertTrue(fullSnapshot.contains("snapshotRequestId:\"snapshot-request-1\""))
+    }
+
+    @Test
+    fun forensicCorrelationDoesNotCrossBrowsingWindows() {
+        val archive = ResearchArchive()
+        archive.addRecord(JSONObject()
+            .put("source", "user-action")
+            .put("time", 1_000L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-main")
+            .put("action", "click"))
+        archive.addRecord(JSONObject()
+            .put("source", "webview")
+            .put("time", 1_010L)
+            .put("windowId", "window-0001")
+            .put("method", "POST")
+            .put("url", "https://example.test/api"))
+        archive.addRecord(JSONObject()
+            .put("source", "webview")
+            .put("time", 1_020L)
+            .put("windowId", "window-0002")
+            .put("method", "POST")
+            .put("url", "https://example.test/api"))
+        archive.addRecord(JSONObject()
+            .put("source", "fetch")
+            .put("time", 1_030L)
+            .put("windowId", "window-0002")
+            .put("frameId", "frame-0002-main")
+            .put("method", "POST")
+            .put("url", "https://example.test/api")
+            .put("status", 200))
+
+        val action = archive.records.getJSONObject(0)
+        val webviewOne = archive.records.getJSONObject(1)
+        val webviewTwo = archive.records.getJSONObject(2)
+        val fetchTwo = archive.records.getJSONObject(3)
+
+        assertEquals(webviewTwo.getString("requestId"), fetchTwo.getString("requestId"))
+        assertFalse(fetchTwo.getString("requestId") == webviewOne.getString("requestId"))
+        assertFalse(fetchTwo.has("relatedActionId"))
+        assertTrue(action.has("actionId"))
+    }
+
+    @Test
+    fun multiContextTimelineAndManifestPreserveWindowsAndFrames() {
+        val archive = ResearchArchive()
+        archive.addRecord(JSONObject()
+            .put("source", "window-created")
+            .put("time", 1_000L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-main")
+            .put("creationReason", "initial"))
+        archive.addRecord(JSONObject()
+            .put("source", "frame-capture-mode")
+            .put("time", 1_010L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-main")
+            .put("mode", "modern"))
+        archive.addRecord(JSONObject()
+            .put("source", "user-action")
+            .put("time", 1_100L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-0001")
+            .put("sourceOrigin", "https://frame.example")
+            .put("action", "click")
+            .put("browserActionToken", "frame-token"))
+        archive.addRecord(JSONObject()
+            .put("source", "fetch")
+            .put("time", 1_120L)
+            .put("windowId", "window-0001")
+            .put("frameId", "frame-0001-0001")
+            .put("sourceOrigin", "https://frame.example")
+            .put("method", "POST")
+            .put("url", "https://frame.example/api")
+            .put("status", 200)
+            .put("browserActionToken", "frame-token"))
+        archive.putArtifact("frames/window-0001/frame-0001-0001/snapshot-1.json", "{}".toByteArray())
+        archive.putArtifact("windows/window-0001/page-snapshot.json", "{}".toByteArray())
+
+        val timeline = ForensicTimelineExport.buildTimeline(archive).getJSONArray("events")
+        assertEquals("window-0001", timeline.getJSONObject(2).getString("windowId"))
+        assertEquals("frame-0001-0001", timeline.getJSONObject(2).getString("frameId"))
+
+        val relations = ForensicTimelineExport.buildRelations(archive)
+        assertEquals(1, relations.getJSONArray("windows").length())
+        assertEquals(2, relations.getJSONArray("frames").length())
+        assertEquals("observed-browser-event-context", relations.getJSONArray("requests").getJSONObject(0).getString("actionRelation"))
+
+        val manifest = SessionManifestBuilder(archive).build("https://example.test")
+        assertEquals(1, manifest.getJSONObject("counters").getInt("windowCount"))
+        assertEquals(2, manifest.getJSONObject("counters").getInt("forensicFrameCount"))
+        assertEquals("modern", manifest.getJSONObject("browsingContexts").getString("frameCaptureMode"))
+        assertEquals(1, manifest.getJSONObject("counters").getInt("frameSnapshotArtifacts"))
+        assertEquals(1, manifest.getJSONObject("counters").getInt("windowSnapshotArtifacts"))
+
+        val output = ByteArrayOutputStream()
+        ResearchArchiveExporter(archive).writeZip(output, "https://example.test")
+        val entries = unzip(output.toByteArray())
+        assertTrue(entries.containsKey("browsing-contexts.json"))
+        assertTrue(entries.containsKey("browser/frames/window-0001/frame-0001-0001/snapshot-1.json"))
+        assertTrue(entries.containsKey("browser/windows/window-0001/page-snapshot.json"))
     }
 
     @Test
@@ -421,6 +525,7 @@ class CaptureRegressionTest {
             "network.har",
             "api-summary.json",
             "actions.json",
+            "browsing-contexts.json",
             "dom-mutations.json",
             "realtime.json",
             "performance.json",

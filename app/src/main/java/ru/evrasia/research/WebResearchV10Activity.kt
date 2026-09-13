@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
@@ -22,15 +24,25 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class WebResearchV10Activity : AppCompatActivity() {
+    private data class WindowRuntime(
+        val windowId: String,
+        val mainFrameId: String,
+        val web: WebView,
+        val captureController: WebCaptureController,
+        val webViewController: WebResearchWebViewController
+    )
+
     internal fun researchWebView(): WebView? = if (::web.isInitialized) web else null
     internal fun researchArchive(): ResearchArchive = archive
     internal fun researchUserAgent(): String = if (::userAgent.isInitialized) userAgent else ""
+
     internal fun clearResearchSession() {
         archive.clear()
         NetworkDebugStore.clear()
-        if (::captureController.isInitialized) captureController.clearPending()
+        windowRuntimes.values.forEach { it.captureController.clearPending() }
         updateBadge()
     }
 
@@ -53,7 +65,10 @@ class WebResearchV10Activity : AppCompatActivity() {
     private lateinit var menuController: WebResearchMenuController
     private lateinit var extensionManager: ExtensionManager
     private lateinit var extensionManagerUi: ExtensionManagerUi
+    private lateinit var windowController: BrowserWindowController
+
     private val archive = ResearchArchive()
+    private val windowRuntimes = linkedMapOf<String, WindowRuntime>()
     private lateinit var userAgent: String
     private val badgeUpdatePending = AtomicBoolean(false)
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -101,12 +116,14 @@ class WebResearchV10Activity : AppCompatActivity() {
                     }
                 },
                 onZip = { handleZipAction() },
+                onWindows = { if (::windowController.isInitialized) windowController.showWindowPicker() },
                 onNetwork = {
                     ensureInstrumentation()
                     startActivity(Intent(this, NetworkDebuggerActivity::class.java))
                 }
             )
         )
+
         web = browserViews.web
         swipeRefresh = browserViews.swipeRefresh
         address = browserViews.address
@@ -126,15 +143,13 @@ class WebResearchV10Activity : AppCompatActivity() {
         }
         ViewCompat.requestApplyInsets(root)
 
-        web.settings.javaScriptEnabled = true
-        web.settings.domStorageEnabled = true
-        web.settings.databaseEnabled = true
-        web.settings.setSupportMultipleWindows(true)
-        web.settings.javaScriptCanOpenWindowsAutomatically = true
         userAgent = web.settings.userAgentString + " WebResearch/10"
-        web.settings.userAgentString = userAgent
-
-        navigationController = WebNavigationController(this, web, address) { addRecord(it) }
+        navigationController = WebNavigationController(
+            activity = this,
+            webProvider = { web },
+            address = address,
+            record = { addRecord(it) }
+        )
         bookmarkController = WebBookmarkController(
             activity = this,
             normalizeUrl = { raw -> navigationController.normalizeUrl(raw) },
@@ -145,66 +160,166 @@ class WebResearchV10Activity : AppCompatActivity() {
             }
         )
         bookmarkController.bind(browserViews.bookmarkSpinner)
-        captureController = WebCaptureController(
-            activity = this,
-            web = web,
-            archive = archive,
-            userAgent = userAgent,
-            record = { addRecord(it) },
-            onChanged = { scheduleBadgeUpdate() },
-            onSnapshot = { scheduleBadgeUpdate() }
-        )
+        extensionManager = ExtensionManager(this)
         WebView.setWebContentsDebuggingEnabled(true)
-        web.addJavascriptInterface(captureController.bridge, "EvrasiaResearch")
+
+        windowController = BrowserWindowController(
+            activity = this,
+            container = swipeRefresh,
+            record = { addRecord(it) },
+            configure = { targetWeb, windowId, mainFrameId ->
+                configureWindow(targetWeb, windowId, mainFrameId)
+            },
+            onActivated = { targetWeb, windowId, _ ->
+                activateRuntime(targetWeb, windowId)
+            },
+            onClosed = { windowId, _ ->
+                windowRuntimes.remove(windowId)?.captureController?.shutdown()
+            },
+            onCountChanged = { count ->
+                if (::browserViews.isInitialized) {
+                    browserViews.windowButton.text = count.toString()
+                    browserViews.windowButton.contentDescription = "Окна: $count"
+                }
+            }
+        )
+        windowController.registerInitial(web)
+        configureSwipeRefresh()
+
         exportController = WebResearchExportController(
             activity = this,
             archive = archive,
-            web = web,
-            captureSnapshot = { capturePageSnapshot() }
+            webProvider = { web },
+            captureSnapshot = { onReady -> capturePageSnapshots(onReady) }
         )
-        extensionManager = ExtensionManager(this)
-
-        webViewController = WebResearchWebViewController(
-            activity = this,
-            web = web,
-            swipeRefresh = swipeRefresh,
-            address = address,
-            captureController = captureController,
-            navigationController = navigationController,
-            extensionManager = extensionManager,
-            handler = uiHandler,
-            record = { addRecord(it) },
-            onLoadingChanged = { isLoading ->
-                loading = isLoading
-                if (!isLoading) editingAddress = false
-                updatePageAction()
-                progress.visibility = if (isLoading) View.VISIBLE else View.INVISIBLE
-            },
-            onProgressChanged = { value ->
-                progress.progress = value
-                if (value in 1..99) progress.visibility = View.VISIBLE
-                if (value >= 100 && !loading) progress.visibility = View.INVISIBLE
-            },
-            onPageUrlChanged = { url ->
-                if (!address.hasFocus()) address.setText(url)
-            }
-        )
-        webViewController.install()
         extensionManagerUi = ExtensionManagerUi(
             activity = this,
             manager = extensionManager,
-            onChanged = { webViewController.reloadExtensions(reloadPage = true) }
+            onChanged = {
+                windowRuntimes.values.forEach { it.webViewController.reloadExtensions(reloadPage = false) }
+                if (::web.isInitialized && !web.url.isNullOrBlank()) web.reload()
+            }
         )
+        bindMenuController()
+        navigationController.navigate("https://evrasia.rest/")
+    }
+
+    @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
+    private fun configureWindow(targetWeb: WebView, windowId: String, mainFrameId: String) {
+        targetWeb.settings.javaScriptEnabled = true
+        targetWeb.settings.domStorageEnabled = true
+        targetWeb.settings.databaseEnabled = true
+        targetWeb.settings.setSupportMultipleWindows(true)
+        targetWeb.settings.javaScriptCanOpenWindowsAutomatically = true
+        targetWeb.settings.userAgentString = userAgent
+        targetWeb.setBackgroundColor(android.graphics.Color.WHITE)
+        targetWeb.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN && bookmarkBarVisible) {
+                setBookmarkBarVisible(false)
+                address.clearFocus()
+            }
+            false
+        }
+
+        fun windowRecord(record: JSONObject): JSONObject {
+            if (!record.has("windowId")) record.put("windowId", windowId)
+            return record
+        }
+
+        val capture = WebCaptureController(
+            activity = this,
+            web = targetWeb,
+            archive = archive,
+            windowId = windowId,
+            mainFrameId = mainFrameId,
+            userAgent = userAgent,
+            record = { addRecord(windowRecord(it)) },
+            onChanged = { scheduleBadgeUpdate() },
+            onSnapshot = { scheduleBadgeUpdate() }
+        )
+        targetWeb.addJavascriptInterface(capture.bridge, "EvrasiaResearch")
+        capture.installFrameCapture()
+
+        val controller = WebResearchWebViewController(
+            activity = this,
+            web = targetWeb,
+            swipeRefresh = swipeRefresh,
+            address = address,
+            captureController = capture,
+            navigationController = navigationController,
+            extensionManager = extensionManager,
+            handler = uiHandler,
+            record = { addRecord(windowRecord(it)) },
+            onLoadingChanged = { isLoading ->
+                if (windowController.active()?.windowId == windowId) {
+                    loading = isLoading
+                    if (!isLoading) editingAddress = false
+                    updatePageAction()
+                    progress.visibility = if (isLoading) View.VISIBLE else View.INVISIBLE
+                }
+            },
+            onProgressChanged = { value ->
+                if (windowController.active()?.windowId == windowId) {
+                    progress.progress = value
+                    if (value in 1..99) progress.visibility = View.VISIBLE
+                    if (value >= 100 && !loading) progress.visibility = View.INVISIBLE
+                }
+            },
+            onPageUrlChanged = { url ->
+                if (windowController.active()?.windowId == windowId && !address.hasFocus()) address.setText(url)
+            },
+            onCreateWindowRequested = { opener, isDialog, isUserGesture, resultMsg: Message ->
+                windowController.createPopup(opener, isDialog, isUserGesture, resultMsg)
+            },
+            onCloseWindowRequested = { closingWeb ->
+                windowController.close(closingWeb)
+            }
+        )
+        controller.install()
+        windowRuntimes[windowId] = WindowRuntime(windowId, mainFrameId, targetWeb, capture, controller)
+
+        if (zipRecordingStartedAt != null) {
+            capture.resetCheckpointWindow()
+            capture.captureCheckpoint("recording-window-created")
+        }
+    }
+
+    private fun activateRuntime(targetWeb: WebView, windowId: String) {
+        val runtime = windowRuntimes[windowId] ?: return
+        web = targetWeb
+        captureController = runtime.captureController
+        webViewController = runtime.webViewController
+        loading = web.progress in 1..99
+        progress.progress = web.progress
+        progress.visibility = if (loading) View.VISIBLE else View.INVISIBLE
+        if (!address.hasFocus()) address.setText(web.url ?: "about:blank")
+        editingAddress = false
+        updatePageAction()
+        configureSwipeRefresh()
+        if (::bookmarkController.isInitialized) bindMenuController()
+    }
+
+    private fun configureSwipeRefresh() {
+        if (!::swipeRefresh.isInitialized || !::web.isInitialized) return
+        swipeRefresh.setOnChildScrollUpCallback { _, _ -> web.canScrollVertically(-1) }
+        swipeRefresh.setOnRefreshListener {
+            web.reload()
+            uiHandler.postDelayed({ swipeRefresh.isRefreshing = false }, 15000)
+        }
+    }
+
+    private fun bindMenuController() {
+        if (!::bookmarkController.isInitialized || !::webViewController.isInitialized) return
+        if (::menuController.isInitialized) menuController.dismiss()
         menuController = WebResearchMenuController(
             activity = this,
             bookmarkController = bookmarkController,
             webViewController = webViewController,
-            onExtensions = { extensionManagerUi.show() },
+            onExtensions = { if (::extensionManagerUi.isInitialized) extensionManagerUi.show() },
             paletteProvider = { palette },
             currentPageProvider = { currentPage() },
             onAccentColor = { color, persist -> applyAccentColor(color, persist) }
         )
-        navigationController.navigate("https://evrasia.rest/")
     }
 
     private fun configureSystemBars() {
@@ -268,8 +383,34 @@ class WebResearchV10Activity : AppCompatActivity() {
         if (::captureController.isInitialized) captureController.ensureInstrumentation()
     }
 
-    private fun capturePageSnapshot() {
-        if (::captureController.isInitialized) captureController.capturePageSnapshot()
+    private fun capturePageSnapshots(onReady: () -> Unit) {
+        val runtimes = windowRuntimes.values.toList()
+        if (runtimes.isEmpty()) {
+            onReady()
+            return
+        }
+
+        val activeId = windowController.active()?.windowId
+        val remaining = AtomicInteger(runtimes.size)
+        val completeOne: () -> Unit = {
+            if (remaining.decrementAndGet() == 0) {
+                activeId?.let { id ->
+                    archive.extraArtifacts["windows/$id/page-snapshot.json"]?.let { bytes ->
+                        runCatching { JSONObject(bytes.toString(Charsets.UTF_8)) }
+                            .getOrNull()
+                            ?.let { archive.updateSnapshot(it) }
+                    }
+                }
+                onReady()
+            }
+        }
+
+        runtimes.filter { it.windowId != activeId }.forEach {
+            it.captureController.capturePageSnapshot(completeOne)
+        }
+        activeId?.let { id ->
+            windowRuntimes[id]?.captureController?.capturePageSnapshot(completeOne)
+        }
     }
 
     private fun addRecord(record: JSONObject) {
@@ -298,16 +439,16 @@ class WebResearchV10Activity : AppCompatActivity() {
             zipRecordingStartedAt = System.currentTimeMillis()
             WebResearchBrowserLayout.setZipRecording(this, browserViews, true)
             zipButton.contentDescription = "Остановить запись ZIP"
-            if (::captureController.isInitialized) {
-                captureController.resetCheckpointWindow()
-                captureController.captureCheckpoint("recording-start")
+            windowRuntimes.values.forEach {
+                it.captureController.resetCheckpointWindow()
+                it.captureController.captureCheckpoint("recording-start")
             }
         } else {
             val endedAt = System.currentTimeMillis()
             zipRecordingStartedAt = null
             WebResearchBrowserLayout.setZipRecording(this, browserViews, false)
             zipButton.contentDescription = "Начать запись ZIP"
-            if (::captureController.isInitialized) captureController.captureCheckpoint("recording-stop")
+            windowRuntimes.values.forEach { it.captureController.captureCheckpoint("recording-stop") }
             exportController.exportWindow(startedAt, endedAt + 750L)
         }
     }
@@ -328,12 +469,18 @@ class WebResearchV10Activity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::menuController.isInitialized) menuController.dismiss()
-        if (::captureController.isInitialized) captureController.shutdown()
+        windowRuntimes.values.forEach { it.captureController.shutdown() }
+        if (::windowController.isInitialized) windowController.destroyAll()
+        windowRuntimes.clear()
         super.onDestroy()
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
+        when {
+            ::web.isInitialized && web.canGoBack() -> web.goBack()
+            ::windowController.isInitialized && windowController.all().size > 1 -> windowController.close()
+            else -> super.onBackPressed()
+        }
     }
 }

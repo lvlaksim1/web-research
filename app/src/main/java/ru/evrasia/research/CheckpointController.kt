@@ -14,6 +14,8 @@ internal class CheckpointController(
     private val activity: AppCompatActivity,
     private val web: WebView,
     private val archive: ResearchArchive,
+    private val windowId: String,
+    private val mainFrameId: String,
     private val record: (JSONObject) -> Unit,
     private val onChanged: () -> Unit
 ) {
@@ -42,6 +44,8 @@ internal class CheckpointController(
             val page = web.url.orEmpty()
             val state = JSONObject()
                 .put("time", System.currentTimeMillis())
+                .put("windowId", windowId)
+                .put("frameId", mainFrameId)
                 .put("reason", reason)
                 .put("url", page)
                 .put("title", web.title.orEmpty())
@@ -117,6 +121,8 @@ internal class CheckpointController(
             return
         }
 
+        state.put("windowId", windowId)
+        state.put("frameId", mainFrameId)
         activity.runOnUiThread {
             captureOnUi(reason, state)
         }
@@ -142,6 +148,8 @@ internal class CheckpointController(
 
 
         val page = state.optString("url", web.url ?: "")
+        state.put("windowId", windowId)
+        state.put("frameId", mainFrameId)
         state.put("nativeCookie", CookieManager.getInstance().getCookie(page).orEmpty())
 
         val screenshot = if (screenshotCount < MAX_SCREENSHOTS) {
