@@ -73,6 +73,10 @@ internal class WebCaptureController(
         web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies), null)
     }
 
+    fun resetCheckpointWindow() {
+        checkpointController.reset()
+    }
+
     fun captureCheckpoint(reason: String) {
         ensureInstrumentation()
         checkpointController.request(reason)
