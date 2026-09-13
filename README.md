@@ -5,17 +5,17 @@ Android WebView-инструмент для максимально полног�
 <!-- AUTO-RELEASE-START -->
 ## Текущий релиз
 
-- Версия: **v46**
-- `versionCode`: **46**
-- `versionName`: **v46**
+- Версия: **v47**
+- `versionCode`: **47**
+- `versionName`: **v47**
 - package: `web.research`
-- commit: `134b807c7223001a9b61a929311133ddb5482c39`
-- APK: `web-research-v46.apk`
-- SHA-256: `d0737aeba12d2c7ac09af7fcecab4b90082ad2c3094d97626766901ce89b29b9`
-- Опубликован: `2026-09-13T21:45:44Z`
-- Предыдущий релиз: **v45**
-- Release: https://github.com/lvlaksim1/web-research/releases/tag/v46
-- APK: https://github.com/lvlaksim1/web-research/releases/download/v46/web-research-v46.apk
+- commit: `76ba8a29623f67e71a4751e6a1025b3b338764ac`
+- APK: `web-research-v47.apk`
+- SHA-256: `41dd164d3684d0bd11ce5d7f7690c3bb07e7e2c41f89f1517df236a39164495b`
+- Опубликован: `2026-09-13T22:32:02Z`
+- Предыдущий релиз: **v46**
+- Release: https://github.com/lvlaksim1/web-research/releases/tag/v47
+- APK: https://github.com/lvlaksim1/web-research/releases/download/v47/web-research-v47.apk
 <!-- AUTO-RELEASE-END -->
 
 ## Назначение

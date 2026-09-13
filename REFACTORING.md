@@ -3,24 +3,23 @@
 <!-- AUTO-RELEASE-START -->
 ## Контрольная точка рефакторинга
 
-- Актуально для релиза: **v46**
-- Релизный commit: `134b807c7223001a9b61a929311133ddb5482c39`
-- Опубликован: `2026-09-13T21:45:44Z`
+- Актуально для релиза: **v47**
+- Релизный commit: `76ba8a29623f67e71a4751e6a1025b3b338764ac`
+- Опубликован: `2026-09-13T22:32:02Z`
 
 ### Изменения между релизами
 
-- chore: remove v45 release request
-- v46: capture runtime UI state (#13)
-- release: web research v46 [release]
+- chore: remove v46 release request
+- v47: stabilize forensic checkpoints (#14)
+- release: web research v47 [release]
 
 ### Изменённые файлы
 
-- `.release/requests/v45.md`
 - `.release/requests/v46.md`
+- `.release/requests/v47.md`
 - `CAPTURE_MATRIX.md`
 - `app/src/main/java/ru/evrasia/research/CheckpointController.kt`
-- `app/src/main/java/ru/evrasia/research/CheckpointExport.kt`
-- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/main/java/ru/evrasia/research/WebCaptureController.kt`
 - `app/src/main/java/ru/evrasia/research/WebResearchScripts.kt`
 - `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
 <!-- AUTO-RELEASE-END -->
