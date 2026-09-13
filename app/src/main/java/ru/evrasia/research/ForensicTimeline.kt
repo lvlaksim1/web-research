@@ -22,6 +22,7 @@ internal class ForensicTimeline(
         private const val MUTATION_REQUEST_WINDOW_MS = 8_000L
         private const val MAX_RECENT_ACTIONS = 64
         private const val MAX_RECENT_REQUESTS = 512
+        private const val MAX_CAUSE_TOKENS = 512
     }
 
     private data class ActionHint(val id: String, val time: Long)
@@ -40,6 +41,7 @@ internal class ForensicTimeline(
     private var mutationCounter = 0L
     private var checkpointCounter = 0L
     private val recentActions = ArrayDeque<ActionHint>()
+    private val actionByCauseToken = linkedMapOf<String, String>()
     private val recentWebViewRequests = ArrayDeque<RequestHint>()
     private val recentApplicationRequests = ArrayDeque<RequestHint>()
 
@@ -63,6 +65,7 @@ internal class ForensicTimeline(
                 }
                 record.put("actionId", actionId)
                 rememberAction(ActionHint(actionId, eventTime))
+                rememberCause(record.optString("causeToken", ""), actionId)
             }
 
             "webview" -> {
@@ -90,7 +93,7 @@ internal class ForensicTimeline(
                         url = comparableUrl(record.optString("url", ""))
                     )
                 )
-                linkNearestAction(record, eventTime)
+                linkAction(record, eventTime)
             }
 
             "resource-copy", "download" -> {
@@ -102,7 +105,7 @@ internal class ForensicTimeline(
                 if (record.optString("mutationId", "").isBlank()) {
                     record.put("mutationId", id("mutation", mutationCounter))
                 }
-                linkNearestAction(record, eventTime)
+                linkAction(record, eventTime)
                 nearestApplicationRequest(eventTime)?.let {
                     record.put("relatedRequestId", it.id)
                     record.put("requestRelation", "temporal-nearest")
@@ -114,15 +117,19 @@ internal class ForensicTimeline(
                 if (record.optString("checkpointId", "").isBlank()) {
                     record.put("checkpointId", id("checkpoint", checkpointCounter))
                 }
-                linkNearestAction(record, eventTime)
+                linkAction(record, eventTime)
                 nearestApplicationRequest(eventTime)?.let {
                     record.put("relatedRequestId", it.id)
                     record.put("requestRelation", "temporal-nearest")
                 }
             }
 
+            "handler-invocation" -> {
+                linkAction(record, eventTime)
+            }
+
             "navigation", "history", "websocket-open", "websocket-send", "sse-open" -> {
-                linkNearestAction(record, eventTime)
+                linkAction(record, eventTime)
             }
         }
     }
@@ -158,10 +165,32 @@ internal class ForensicTimeline(
         return best
     }
 
+    private fun linkAction(record: JSONObject, eventTime: Long) {
+        val causeToken = record.optString("causeToken", "")
+        if (causeToken.isNotBlank()) {
+            val actionId = actionByCauseToken[causeToken]
+            if (!actionId.isNullOrBlank()) {
+                record.put("relatedActionId", actionId)
+                record.put("actionRelation", "js-context")
+                return
+            }
+        }
+        linkNearestAction(record, eventTime)
+    }
+
     private fun linkNearestAction(record: JSONObject, eventTime: Long) {
         val action = nearestAction(eventTime) ?: return
         record.put("relatedActionId", action.id)
         record.put("actionRelation", "temporal-nearest")
+    }
+
+    private fun rememberCause(causeToken: String, actionId: String) {
+        if (causeToken.isBlank()) return
+        actionByCauseToken[causeToken] = actionId
+        while (actionByCauseToken.size > MAX_CAUSE_TOKENS) {
+            val first = actionByCauseToken.keys.firstOrNull() ?: break
+            actionByCauseToken.remove(first)
+        }
     }
 
     private fun nearestAction(eventTime: Long): ActionHint? {
