@@ -3,6 +3,28 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v40-START -->
+## v40 — 2026-09-13T18:31:56Z
+
+- Release commit: `9d9fee5e31abfbe7507dbc4703270c07a0837877`
+- Artifact: `web-research-v40.apk`
+- SHA-256: `752ed5db3c286870e272fc9cdc870eb52a384bba501cd516070c0ebd20ae10af`
+- Previous release: **v39**
+
+### Changes
+
+- chore: remove v39 release request
+- Unify ZIP result actions inside Web Research
+- release: web research v40 [release]
+
+### Changed files
+
+- `.release/requests/v39.md`
+- `.release/requests/v40.md`
+- `app/src/main/java/ru/evrasia/research/ResultDelivery.kt`
+- `app/src/main/java/ru/evrasia/research/WebDownloadController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchExportController.kt`
+<!-- AUTO-CHANGELOG-v40-END -->
 <!-- AUTO-CHANGELOG-v39-START -->
 ## v39 — 2026-09-13T18:11:24Z
 

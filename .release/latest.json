@@ -1,28 +1,27 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 39,
-  "tag": "v39",
-  "versionCode": 39,
-  "versionName": "v39",
+  "releaseNumber": 40,
+  "tag": "v40",
+  "versionCode": 40,
+  "versionName": "v40",
   "packageId": "web.research",
-  "commit": "348cdc72ddea877d3bdaa5a92ee325422714bfc1",
-  "artifact": "web-research-v39.apk",
-  "sha256": "4f4ab05482219907a5f606e6478c3f59963869f30bf0dc185a7a6079c80138ac",
-  "publishedAt": "2026-09-13T18:11:24Z",
-  "previousRelease": "v38",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v39",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v39/web-research-v39.apk",
+  "commit": "9d9fee5e31abfbe7507dbc4703270c07a0837877",
+  "artifact": "web-research-v40.apk",
+  "sha256": "752ed5db3c286870e272fc9cdc870eb52a384bba501cd516070c0ebd20ae10af",
+  "publishedAt": "2026-09-13T18:31:56Z",
+  "previousRelease": "v39",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v40",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v40/web-research-v40.apk",
   "commits": [
-    "chore: remove v38 release request",
-    "Polish ZIP actions, URL sync and extensions UI",
-    "release: web research v39 [release]"
+    "chore: remove v39 release request",
+    "Unify ZIP result actions inside Web Research",
+    "release: web research v40 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v38.md",
     ".release/requests/v39.md",
-    "app/src/main/java/ru/evrasia/research/ExtensionManagerUi.kt",
+    ".release/requests/v40.md",
     "app/src/main/java/ru/evrasia/research/ResultDelivery.kt",
-    "app/src/main/java/ru/evrasia/research/WebResearchExportController.kt",
-    "app/src/main/java/ru/evrasia/research/WebResearchWebViewController.kt"
+    "app/src/main/java/ru/evrasia/research/WebDownloadController.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchExportController.kt"
   ]
 }
