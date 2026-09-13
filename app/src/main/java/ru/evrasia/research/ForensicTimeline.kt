@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.ArrayDeque
 import java.util.UUID
+import java.security.MessageDigest
 import kotlin.math.abs
 
 /**
@@ -238,6 +239,20 @@ internal object ForensicTimelineExport {
             }
         }
 
+        requests.values.forEach { request ->
+            val requestId = request.optString("requestId", "")
+            val initiatorId = request.optString("initiatorId", "")
+            if (initiatorId.isBlank()) return@forEach
+            causalityChains.put(
+                JSONObject()
+                    .put("relatedActionId", request.optString("relatedActionId", ""))
+                    .put("actionRelation", request.optString("actionRelation", ""))
+                    .put("initiatorId", initiatorId)
+                    .put("requestId", requestId)
+                    .put("mutationIds", JSONArray(mutationsByRequest[requestId].orEmpty()))
+            )
+        }
+
         return JSONObject()
             .put("schemaVersion", 1)
             .put("format", "web-research-forensic-timeline-v1")
@@ -268,6 +283,9 @@ internal object ForensicTimelineExport {
         val requests = linkedMapOf<String, JSONObject>()
         val mutations = JSONArray()
         val checkpoints = JSONArray()
+        val initiators = linkedMapOf<String, JSONObject>()
+        val causalityChains = JSONArray()
+        val mutationsByRequest = linkedMapOf<String, MutableList<String>>()
         val links = JSONArray()
         val linkKeys = linkedSetOf<String>()
 
@@ -317,6 +335,38 @@ internal object ForensicTimelineExport {
                             record.optString("actionRelation", "temporal-nearest")
                         )
                     }
+                    if (source == "fetch" || source == "xhr") {
+                        val stack = record.optString("initiatorStack", "")
+                        val frame = initiatorFrame(stack)
+                        if (frame.isNotBlank()) {
+                            val initiatorId = "initiator-" + sha256(frame).take(16)
+                            request.put("initiatorId", initiatorId)
+                            initiators.getOrPut(initiatorId) {
+                                JSONObject()
+                                    .put("initiatorId", initiatorId)
+                                    .put("frame", frame)
+                                    .put("stack", stack.take(16000))
+                            }
+                            addLink(
+                                links,
+                                linkKeys,
+                                initiatorId,
+                                requestId,
+                                "initiator-to-request",
+                                "observed-initiator-stack"
+                            )
+                            if (relatedActionId.isNotBlank()) {
+                                addLink(
+                                    links,
+                                    linkKeys,
+                                    relatedActionId,
+                                    initiatorId,
+                                    "action-to-initiator",
+                                    record.optString("actionRelation", "temporal-nearest")
+                                )
+                            }
+                        }
+                    }
                 }
 
                 record.optString("mutationId", "").takeIf { it.isNotBlank() }?.let { mutationId ->
@@ -340,6 +390,7 @@ internal object ForensicTimelineExport {
                     }
                     if (relatedRequestId.isNotBlank()) {
                         mutation.put("relatedRequestId", relatedRequestId)
+                        mutationsByRequest.getOrPut(relatedRequestId) { mutableListOf() }.add(mutationId)
                         addLink(
                             links,
                             linkKeys,
@@ -371,13 +422,24 @@ internal object ForensicTimelineExport {
             .put("generatedAt", System.currentTimeMillis())
             .put(
                 "relationPolicy",
-                JSONObject().put(
-                    "temporal-nearest",
-                    "inferred proximity only; not proof of JavaScript causality"
-                )
+                JSONObject()
+                    .put(
+                        "temporal-nearest",
+                        "inferred proximity only; not proof of JavaScript causality"
+                    )
+                    .put(
+                        "observed-initiator-stack",
+                        "JavaScript stack was captured synchronously when fetch/XHR started"
+                    )
+                    .put(
+                        "observed-browser-event-context",
+                        "same browser action context token was observed by both events"
+                    )
             )
             .put("actions", JSONArray(actions.values.toList()))
             .put("requests", JSONArray(requests.values.toList()))
+            .put("initiators", JSONArray(initiators.values.toList()))
+            .put("causalityChains", causalityChains)
             .put("mutations", mutations)
             .put("checkpoints", checkpoints)
             .put("links", links)
@@ -432,6 +494,18 @@ internal object ForensicTimelineExport {
                 .put("confidence", if (method == "temporal-nearest") "inferred" else "observed")
         )
     }
+
+    private fun initiatorFrame(stack: String): String {
+        if (stack.isBlank()) return ""
+        val frames = stack.lines().map { it.trim() }.filter { it.startsWith("at ") }
+        return frames.firstOrNull { !it.contains("wrapped", true) && !it.contains("__wr", true) }
+            ?: frames.firstOrNull().orEmpty()
+    }
+
+    private fun sha256(value: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 
     private fun putUnique(array: JSONArray, value: String) {
         for (index in 0 until array.length()) if (array.optString(index) == value) return
