@@ -70,6 +70,17 @@ internal object ResultDelivery {
         showChoice(activity, prepared)
     }
 
+    fun deliverGeneratedFileWithSystemChooser(
+        activity: Activity,
+        title: String,
+        fileName: String,
+        mime: String,
+        writer: (OutputStream) -> Unit
+    ) {
+        val prepared = prepare(activity, title, fileName, mime, null, writer) ?: return
+        share(activity, prepared, chooserTitle = "Выберите действие")
+    }
+
     fun defaultFileName(label: String, value: String = ""): String {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val base = label.lowercase(Locale.US)
@@ -222,7 +233,7 @@ internal object ResultDelivery {
         }
     }
 
-    private fun share(activity: Activity, prepared: Prepared) {
+    private fun share(activity: Activity, prepared: Prepared, chooserTitle: String = "Отправить ${prepared.title}") {
         try {
             val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.files", prepared.file)
             val send = Intent(Intent.ACTION_SEND).apply {
@@ -231,9 +242,9 @@ internal object ResultDelivery {
                 clipData = ClipData.newUri(activity.contentResolver, prepared.title, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(Intent.createChooser(send, "Отправить ${prepared.title}"))
+            activity.startActivity(Intent.createChooser(send, chooserTitle))
         } catch (_: Exception) {
-            Toast.makeText(activity, "Не удалось открыть меню отправки", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, "Не удалось открыть системное меню действий", Toast.LENGTH_LONG).show()
         }
     }
 
