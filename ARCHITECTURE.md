@@ -127,8 +127,10 @@ Dedicated/Shared Worker runtime не перехватывается путём �
 - `WebResearchV10Activity` — lifecycle и верхнеуровневая оркестрация браузера. Она связывает контроллеры, но не должна содержать большие UI-подсистемы или capture-алгоритмы.
 - `WebResearchBrowserLayout` — построение основного browser UI: toolbar, address bar, ZIP, Network, badge, progress, WebView container.
 - `WebResearchMenuController` — меню браузера, bookmarks, cookies UI, theme/accent и About.
-- `WebResearchWebViewController` — WebViewClient/WebChromeClient и события WebView.
-- `WebNavigationController` — URL normalization и navigation.
+- `WebResearchWebViewController` — WebViewClient/WebChromeClient и события конкретного WebView.
+- `BrowserWindowController` — lifecycle нескольких WebView, popup/new-window transport, переключение и закрытие окон.
+- `FrameCaptureController` — document-start multi-frame capture через AndroidX WebKit execution worlds и origin-aware WebMessage bridge.
+- `WebNavigationController` — URL normalization и navigation активного окна.
 - `WebBookmarkController` — bookmarks.
 - `WebDownloadController` — скачивания, инициированные сайтом.
 - `WebCaptureController` — запуск browser-side instrumentation, snapshots, JS bridge и сбор chunk-артефактов.
@@ -163,6 +165,7 @@ Dedicated/Shared Worker runtime не перехватывается путём �
 - `network.har`;
 - `api-summary.json`;
 - `actions.json`;
+- `browsing-contexts.json`;
 - `dom-mutations.json`;
 - `realtime.json`;
 - `performance.json`;
