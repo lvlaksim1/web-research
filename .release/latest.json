@@ -1,27 +1,28 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 40,
-  "tag": "v40",
-  "versionCode": 40,
-  "versionName": "v40",
+  "releaseNumber": 41,
+  "tag": "v41",
+  "versionCode": 41,
+  "versionName": "v41",
   "packageId": "web.research",
-  "commit": "9d9fee5e31abfbe7507dbc4703270c07a0837877",
-  "artifact": "web-research-v40.apk",
-  "sha256": "752ed5db3c286870e272fc9cdc870eb52a384bba501cd516070c0ebd20ae10af",
-  "publishedAt": "2026-09-13T18:31:56Z",
-  "previousRelease": "v39",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v40",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v40/web-research-v40.apk",
+  "commit": "88ac47b60743e06c9e691c41198be447ee933225",
+  "artifact": "web-research-v41.apk",
+  "sha256": "82d6e6d6a0cb964fa55a986508bf80cb4b83362d77e36337da63c3f31596d863",
+  "publishedAt": "2026-09-13T19:03:52Z",
+  "previousRelease": "v40",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v41",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v41/web-research-v41.apk",
   "commits": [
-    "chore: remove v39 release request",
-    "Unify ZIP result actions inside Web Research",
-    "release: web research v40 [release]"
+    "Stage 1: add forensic timeline and event relations",
+    "release: web research v41 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v39.md",
-    ".release/requests/v40.md",
-    "app/src/main/java/ru/evrasia/research/ResultDelivery.kt",
-    "app/src/main/java/ru/evrasia/research/WebDownloadController.kt",
-    "app/src/main/java/ru/evrasia/research/WebResearchExportController.kt"
+    ".release/requests/v41.md",
+    "CAPTURE_MATRIX.md",
+    "app/src/main/java/ru/evrasia/research/ForensicTimeline.kt",
+    "app/src/main/java/ru/evrasia/research/ResearchArchive.kt",
+    "app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt",
+    "app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt",
+    "app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt"
   ]
 }

@@ -3,6 +3,29 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v41-START -->
+## v41 — 2026-09-13T19:03:52Z
+
+- Release commit: `88ac47b60743e06c9e691c41198be447ee933225`
+- Artifact: `web-research-v41.apk`
+- SHA-256: `82d6e6d6a0cb964fa55a986508bf80cb4b83362d77e36337da63c3f31596d863`
+- Previous release: **v40**
+
+### Changes
+
+- Stage 1: add forensic timeline and event relations
+- release: web research v41 [release]
+
+### Changed files
+
+- `.release/requests/v41.md`
+- `CAPTURE_MATRIX.md`
+- `app/src/main/java/ru/evrasia/research/ForensicTimeline.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchive.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt`
+- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v41-END -->
 <!-- AUTO-CHANGELOG-v40-START -->
 ## v40 — 2026-09-13T18:31:56Z
 
