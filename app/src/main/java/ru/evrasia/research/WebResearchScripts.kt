@@ -5,7 +5,7 @@ import org.json.JSONObject
 internal object WebResearchScripts {
     fun instrumentation(): String = """
           (function(){
-            if(window.__WR10)return; window.__WR10=true;
+            if(window.__WR10===true)return; window.__WR10='installing';
             window.__WR_REQ_HINTS=window.__WR_REQ_HINTS||[];
             const send=o=>{try{EvrasiaResearch.record(JSON.stringify(o))}catch(e){}};
             const warn=(code,message,stage,extra)=>send(Object.assign({source:'capture-warning',time:Date.now(),code:code,message:message,stage:stage,url:location.href},extra||{}));
@@ -91,6 +91,7 @@ internal object WebResearchScripts {
             new MutationObserver(ms=>{const ac=window.__WR_ACTIVE_ACTION_CONTEXT||null;if(ac)mutationActionContext=ac;for(const m of ms){if(m.type==='attributes'){mutationAttributes++;continue}mutationAdded+=m.addedNodes?.length||0;mutationRemoved+=m.removedNodes?.length||0;for(const n of Array.from(m.addedNodes||[])){if(!n||n.nodeType!==1)continue;if(String(n.tagName||'').toLowerCase()==='script')archiveScript(n,location.href+'#inline-dynamic-'+(++dynamicInline));try{if(n.querySelectorAll)n.querySelectorAll('script').forEach(s=>archiveScript(s,location.href+'#inline-dynamic-'+(++dynamicInline)))}catch(e){}}}if(!mutationTimer)mutationTimer=setTimeout(flushMutations,1000)}).observe(document.documentElement,{subtree:true,childList:true,attributes:true});
             addEventListener('error',e=>{send({source:'js-error',time:Date.now(),message:e.message,url:e.filename||location.href,line:e.lineno||0,column:e.colno||0});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-js-error',{message:String(e.message||'')}),0)});
             addEventListener('unhandledrejection',e=>{send({source:'promise-rejection',time:Date.now(),message:String(e.reason)});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-promise-rejection',{message:String(e.reason||'')}),0)});
+            window.__WR10=true;
             send({source:'hook',time:Date.now(),url:location.href,status:0});
           })();
         """.trimIndent()
