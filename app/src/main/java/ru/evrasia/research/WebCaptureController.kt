@@ -78,8 +78,16 @@ internal class WebCaptureController(
     }
 
     fun captureCheckpoint(reason: String) {
-        ensureInstrumentation()
-        checkpointController.request(reason)
+        val script = WebResearchScripts.instrumentedCheckpoint(reason)
+        fun attempt(remaining: Int) {
+            if (activity.isFinishing || activity.isDestroyed) return
+            web.evaluateJavascript(script) { result ->
+                if (result != "true" && remaining > 0) {
+                    web.postDelayed({ attempt(remaining - 1) }, 120L)
+                }
+            }
+        }
+        attempt(2)
     }
 
     inner class Bridge {
