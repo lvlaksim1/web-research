@@ -37,6 +37,7 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
             add("network.har", buildHar().toString(2).toByteArray(Charsets.UTF_8))
             add("api-summary.json", buildApiSummary().toString(2).toByteArray(Charsets.UTF_8))
             add("actions.json", buildSourceLog(setOf("user-action", "navigation", "form-submit", "history")).toString(2).toByteArray(Charsets.UTF_8))
+            add("browsing-contexts.json", buildSourceLog(setOf("window-created", "window-activated", "window-closed", "frame-lifecycle", "frame-capture-mode", "frame-snapshot")).toString(2).toByteArray(Charsets.UTF_8))
             add("dom-mutations.json", buildSourceLog(setOf("dom-mutation", "shadow-root", "custom-element")).toString(2).toByteArray(Charsets.UTF_8))
             add("realtime.json", buildSourceLog(setOf("websocket-open", "websocket-state", "websocket-send", "websocket-receive", "sse-open", "sse-state", "sse-message")).toString(2).toByteArray(Charsets.UTF_8))
             add("performance.json", buildSourceLog(setOf("performance", "long-task", "resource-timing", "navigation-timing")).toString(2).toByteArray(Charsets.UTF_8))
