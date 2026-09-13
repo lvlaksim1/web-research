@@ -3,6 +3,31 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v46-START -->
+## v46 — 2026-09-13T21:45:44Z
+
+- Release commit: `134b807c7223001a9b61a929311133ddb5482c39`
+- Artifact: `web-research-v46.apk`
+- SHA-256: `d0737aeba12d2c7ac09af7fcecab4b90082ad2c3094d97626766901ce89b29b9`
+- Previous release: **v45**
+
+### Changes
+
+- chore: remove v45 release request
+- v46: capture runtime UI state (#13)
+- release: web research v46 [release]
+
+### Changed files
+
+- `.release/requests/v45.md`
+- `.release/requests/v46.md`
+- `CAPTURE_MATRIX.md`
+- `app/src/main/java/ru/evrasia/research/CheckpointController.kt`
+- `app/src/main/java/ru/evrasia/research/CheckpointExport.kt`
+- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchScripts.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v46-END -->
 <!-- AUTO-CHANGELOG-v45-START -->
 ## v45 — 2026-09-13T20:54:40Z
 

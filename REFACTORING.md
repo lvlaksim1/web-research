@@ -3,28 +3,25 @@
 <!-- AUTO-RELEASE-START -->
 ## Контрольная точка рефакторинга
 
-- Актуально для релиза: **v45**
-- Релизный commit: `11eaad6dd51a76de7bafc934f322444fe1f1ad1c`
-- Опубликован: `2026-09-13T20:54:40Z`
+- Актуально для релиза: **v46**
+- Релизный commit: `134b807c7223001a9b61a929311133ddb5482c39`
+- Опубликован: `2026-09-13T21:45:44Z`
 
 ### Изменения между релизами
 
-- Stabilize forensic recording after v44 audit (#12)
-- release: web research v45 [release]
+- chore: remove v45 release request
+- v46: capture runtime UI state (#13)
+- release: web research v46 [release]
 
 ### Изменённые файлы
 
 - `.release/requests/v45.md`
+- `.release/requests/v46.md`
 - `CAPTURE_MATRIX.md`
 - `app/src/main/java/ru/evrasia/research/CheckpointController.kt`
-- `app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt`
-- `app/src/main/java/ru/evrasia/research/ForensicTimeline.kt`
-- `app/src/main/java/ru/evrasia/research/ResearchArchive.kt`
-- `app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt`
+- `app/src/main/java/ru/evrasia/research/CheckpointExport.kt`
 - `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
-- `app/src/main/java/ru/evrasia/research/WebCaptureController.kt`
 - `app/src/main/java/ru/evrasia/research/WebResearchScripts.kt`
-- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
 - `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
 <!-- AUTO-RELEASE-END -->
 
