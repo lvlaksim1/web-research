@@ -31,6 +31,7 @@ Android WebView-инструмент для максимально полног�
 - navigation/history и действия пользователя;
 - cookies, `localStorage`, `sessionStorage`;
 - full/light page snapshots, DOM и HTML страницы;
+- runtime UI state: значения form controls, focus/selection, viewport/scroll, iframe inventory/same-origin snapshots и open Shadow DOM;
 - JavaScript-файлы и динамические inline scripts;
 - resource/navigation timing и performance events;
 - DOM mutations;
@@ -50,7 +51,9 @@ Android WebView-инструмент для максимально полног�
 - `checkpoints/index.json` — последовательность автоматических before/after checkpoints;
 - `checkpoint-diffs.json` — изменения cookies, storage и DOM между соседними checkpoints;
 - `checkpoints/<id>/state.json` и ограниченные viewport screenshots;
-- checkpoint/screenshot лимиты начинаются заново при каждом старте ZIP-записи, поэтому действия до записи не расходуют её forensic budget;
+- checkpoint state включает runtime form values/checked/selected, focus и selection, scroll/viewport/VisualViewport, iframe inventory + same-origin frame snapshots и open Shadow DOM;
+- `checkpoint-diffs.json` отдельно показывает изменения form values, checked/selected, focus/selection, viewport, frames и Shadow DOM со значениями before/after;
+- checkpoint/screenshot лимиты начинаются заново при каждом старте ZIP-записи; v46 использует бюджет 80/80 на recording window;
 - внешние JavaScript-файлы и ресурсы, уже захваченные в текущей browser session до начала записи, включаются как supporting evidence;
 - `browser/cookie-trace.json` экспортируется с событиями, отфильтрованными по recording window;
 - `raw-events.json` — исходный журнал событий с forensic ID и capture ordering;

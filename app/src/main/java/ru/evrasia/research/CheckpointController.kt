@@ -19,7 +19,7 @@ internal class CheckpointController(
 ) {
     companion object {
         private const val MAX_CHECKPOINTS = 80
-        private const val MAX_SCREENSHOTS = 40
+        private const val MAX_SCREENSHOTS = 80
         private const val MAX_STATE_CHARS = 1_500_000
         private const val MIN_INTERVAL_MS = 120L
         private const val MAX_SCREENSHOT_PIXELS = 1_800_000.0
@@ -92,7 +92,7 @@ internal class CheckpointController(
                 record(
                     CaptureWarning.create(
                         code = "checkpoint_limit_reached",
-                        message = "Checkpoint capture reached the configured per-session limit.",
+                        message = "Checkpoint capture reached the configured per-recording-window limit.",
                         stage = "checkpoint",
                         url = web.url ?: "",
                         details = JSONObject().put("limit", MAX_CHECKPOINTS)
@@ -115,7 +115,7 @@ internal class CheckpointController(
                 record(
                     CaptureWarning.create(
                         code = "checkpoint_screenshot_limit_reached",
-                        message = "Checkpoint screenshots reached the configured per-session limit; later checkpoint state is still captured.",
+                        message = "Checkpoint screenshots reached the configured per-recording-window limit; later checkpoint state is still captured.",
                         stage = "checkpoint",
                         url = page,
                         details = JSONObject().put("limit", MAX_SCREENSHOTS)
