@@ -45,6 +45,7 @@ Android WebView-инструмент для максимально полног�
 - `session-manifest.json` — counters, completeness indicators, фактические предупреждения и явные capture limits;
 - `timeline.json` — компактная единая временная шкала с event/action/request/mutation ID;
 - `relations.json` — производные связи action → request → DOM mutation с указанием метода корреляции;
+- `relations.json` также содержит JS initiators и causality chains: action → initiator stack → request → DOM mutation, с отдельной маркировкой observed/inferred;
 - `checkpoints/index.json` — последовательность автоматических before/after checkpoints;
 - `checkpoint-diffs.json` — изменения cookies, storage и DOM между соседними checkpoints;
 - `checkpoints/<id>/state.json` и ограниченные viewport screenshots;
