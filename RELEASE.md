@@ -5,11 +5,11 @@
 <!-- AUTO-RELEASE-START -->
 ## Последний проверенный релиз
 
-- Релиз: **v38**
-- Релизный commit: `4e451c05d049d8ccd9f5c9be7ba8583fe2726158`
-- Артефакт: `web-research-v38.apk`
-- SHA-256: `d6efc39d5f695dd69950c2a4654e900c8b5758fc12bb1c2c5b4674b06d45fb71`
-- Опубликован: `2026-09-13T17:48:10Z`
+- Релиз: **v39**
+- Релизный commit: `348cdc72ddea877d3bdaa5a92ee325422714bfc1`
+- Артефакт: `web-research-v39.apk`
+- SHA-256: `4f4ab05482219907a5f606e6478c3f59963869f30bf0dc185a7a6079c80138ac`
+- Опубликован: `2026-09-13T18:11:24Z`
 <!-- AUTO-RELEASE-END -->
 
 ## Уровни release-системы
