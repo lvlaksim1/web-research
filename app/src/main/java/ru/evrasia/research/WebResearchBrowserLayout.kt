@@ -44,6 +44,7 @@ internal object WebResearchBrowserLayout {
         val onPageAction: () -> Unit,
         val onBookmarkAdd: () -> Unit,
         val onZip: () -> Unit,
+        val onWindows: () -> Unit,
         val onNetwork: () -> Unit
     )
 
@@ -57,6 +58,7 @@ internal object WebResearchBrowserLayout {
         val bookmarkSpinner: Spinner,
         val bookmarkAddButton: Button,
         val zipButton: Button,
+        val windowButton: Button,
         val menuButton: Button,
         val networkButton: Button,
         val networkBadge: TextView,
@@ -288,6 +290,25 @@ internal object WebResearchBrowserLayout {
         }
         toolbar.addView(zipButton, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) })
 
+        val windowButton = Button(activity).apply {
+            tag = "browser-windows"
+            text = "1"
+            contentDescription = "Окна: 1"
+            isAllCaps = false
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(palette.accent)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(0, 0, 0, 0)
+            background = rounded(palette.card, 16f, palette.divider)
+            setOnClickListener { callbacks.onWindows() }
+        }
+        toolbar.addView(windowButton, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) })
+
         val networkContainer = FrameLayout(activity).apply {
             tag = "browser-network"
             clipChildren = true
@@ -384,6 +405,7 @@ internal object WebResearchBrowserLayout {
             bookmarkSpinner = bookmarkSpinner,
             bookmarkAddButton = bookmarkAddButton,
             zipButton = zipButton,
+            windowButton = windowButton,
             menuButton = menuButton,
             networkButton = networkButton,
             networkBadge = networkBadge,
@@ -404,6 +426,7 @@ internal object WebResearchBrowserLayout {
             cornerRadius = dp(radius.toInt()).toFloat()
         }
         views.zipButton.setTextColor(accent)
+        views.windowButton.setTextColor(accent)
         views.bookmarkAddButton.foreground = TechIconDrawable(TechIconDrawable.Kind.BOOKMARK_ADD, accent)
         views.menuButton.foreground = TechIconDrawable(TechIconDrawable.Kind.MENU, accent)
         val pageKind = when (views.pageAction.contentDescription?.toString()) {
