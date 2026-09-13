@@ -41,6 +41,9 @@ class ResearchArchive internal constructor(
             .put("page", state.optString("url", ""))
             .put("title", state.optString("title", ""))
 
+        if (state.has("windowId")) event.put("windowId", state.optString("windowId", ""))
+        if (state.has("frameId")) event.put("frameId", state.optString("frameId", ""))
+
         state.optJSONObject("trigger")?.let { trigger ->
             if (trigger.has("method")) event.put("method", trigger.optString("method", ""))
             if (trigger.has("url")) event.put("url", trigger.optString("url", ""))
