@@ -3,6 +3,28 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v36-START -->
+## v36 — 2026-09-13T17:01:05Z
+
+- Release commit: `817b2e34c58d38a8ebc3ef7a0464031ae985688d`
+- Artifact: `web-research-v36.apk`
+- SHA-256: `7634de83975349c8bdcf3be3030170d29afee8b9fbe13482162b83a06c712c8d`
+- Previous release: **v35**
+
+### Changes
+
+- chore: remove v35 release request
+- Fix Chromium extension match patterns
+- release: web research v36 [release]
+
+### Changed files
+
+- `.release/requests/v35.md`
+- `.release/requests/v36.md`
+- `app/src/main/java/ru/evrasia/research/ExtensionContentScriptController.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionMatchPattern.kt`
+- `app/src/test/java/ru/evrasia/research/ExtensionMatchPatternTest.kt`
+<!-- AUTO-CHANGELOG-v36-END -->
 <!-- AUTO-CHANGELOG-v35-START -->
 ## v35 — 2026-09-13T16:27:52Z
 
