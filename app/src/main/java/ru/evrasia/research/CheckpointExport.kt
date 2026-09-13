@@ -122,20 +122,20 @@ internal object CheckpointExport {
 
     private fun runtimeValueMap(state: JSONObject): Map<String, String> {
         val out = linkedMapOf<String, String>()
-        domElements(state).forEachIndexed { index, element ->
-            val runtime = element.optJSONObject("runtime") ?: return@forEachIndexed
-            if (!runtime.has("value")) return@forEachIndexed
-            out[element.optString("key", "").ifBlank { "index:$index" }] = runtime.optString("value", "")
+        runtimeElements(state).forEach { (key, element) ->
+            val runtime = element.optJSONObject("runtime") ?: return@forEach
+            if (!runtime.has("value")) return@forEach
+            out[key] = runtime.optString("value", "")
         }
         return out
     }
 
     private fun runtimeCheckedMap(state: JSONObject): Map<String, String> {
         val out = linkedMapOf<String, String>()
-        domElements(state).forEachIndexed { index, element ->
-            val runtime = element.optJSONObject("runtime") ?: return@forEachIndexed
-            if (!runtime.has("checked") && !runtime.has("indeterminate")) return@forEachIndexed
-            out[element.optString("key", "").ifBlank { "index:$index" }] = JSONObject()
+        runtimeElements(state).forEach { (key, element) ->
+            val runtime = element.optJSONObject("runtime") ?: return@forEach
+            if (!runtime.has("checked") && !runtime.has("indeterminate")) return@forEach
+            out[key] = JSONObject()
                 .apply {
                     if (runtime.has("checked")) put("checked", runtime.optBoolean("checked"))
                     if (runtime.has("indeterminate")) put("indeterminate", runtime.optBoolean("indeterminate"))
@@ -147,16 +147,55 @@ internal object CheckpointExport {
 
     private fun runtimeSelectedMap(state: JSONObject): Map<String, String> {
         val out = linkedMapOf<String, String>()
-        domElements(state).forEachIndexed { index, element ->
-            val runtime = element.optJSONObject("runtime") ?: return@forEachIndexed
-            if (!runtime.has("selected") && !runtime.has("selectedIndex") && !runtime.has("selectedValues")) return@forEachIndexed
-            out[element.optString("key", "").ifBlank { "index:$index" }] = JSONObject()
+        runtimeElements(state).forEach { (key, element) ->
+            val runtime = element.optJSONObject("runtime") ?: return@forEach
+            if (!runtime.has("selected") && !runtime.has("selectedIndex") && !runtime.has("selectedValues")) return@forEach
+            out[key] = JSONObject()
                 .apply {
                     if (runtime.has("selected")) put("selected", runtime.optBoolean("selected"))
                     if (runtime.has("selectedIndex")) put("selectedIndex", runtime.optInt("selectedIndex"))
                     runtime.optJSONArray("selectedValues")?.let { put("selectedValues", JSONArray(it.toString())) }
                 }
                 .toString()
+        }
+        return out
+    }
+
+    private fun runtimeElements(state: JSONObject, prefix: String = ""): List<Pair<String, JSONObject>> {
+        val out = mutableListOf<Pair<String, JSONObject>>()
+        domElements(state).forEachIndexed { index, element ->
+            val localKey = element.optString("key", "").ifBlank { "index:$index" }
+            out.add((if (prefix.isBlank()) localKey else "$prefix/$localKey") to element)
+        }
+
+        val roots = state.optJSONObject("shadowDom")?.optJSONArray("roots")
+        if (roots != null) {
+            for (rootIndex in 0 until roots.length()) {
+                val root = roots.optJSONObject(rootIndex) ?: continue
+                val hostKey = root.optJSONObject("host")?.optString("key", "").orEmpty().ifBlank { "index:$rootIndex" }
+                val elements = root.optJSONArray("elements") ?: continue
+                for (index in 0 until elements.length()) {
+                    val element = elements.optJSONObject(index) ?: continue
+                    val localKey = element.optString("key", "").ifBlank { "index:$index" }
+                    val key = listOf(prefix.takeIf { it.isNotBlank() }, "shadow:$hostKey", localKey)
+                        .filterNotNull()
+                        .joinToString("/")
+                    out.add(key to element)
+                }
+            }
+        }
+
+        val frames = state.optJSONObject("frames")?.optJSONArray("items")
+        if (frames != null) {
+            for (frameIndex in 0 until frames.length()) {
+                val frame = frames.optJSONObject(frameIndex) ?: continue
+                val snapshot = frame.optJSONObject("snapshot") ?: continue
+                val frameKey = frame.optString("key", "").ifBlank { "index:$frameIndex" }
+                val nextPrefix = listOf(prefix.takeIf { it.isNotBlank() }, "frame:$frameKey")
+                    .filterNotNull()
+                    .joinToString("/")
+                out.addAll(runtimeElements(snapshot, nextPrefix))
+            }
         }
         return out
     }
