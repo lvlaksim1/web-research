@@ -5,6 +5,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 internal class WebCaptureController(
@@ -20,6 +21,7 @@ internal class WebCaptureController(
 ) {
     private val scriptChunks = ConcurrentHashMap<String, MutableMap<Int, String>>()
     private val artifactChunks = ConcurrentHashMap<String, MutableMap<Int, String>>()
+    private val snapshotCallbacks = ConcurrentHashMap<String, () -> Unit>()
     private val resourceCapture = WebResourceCapture(
         archive = archive,
         userAgent = userAgent,
@@ -57,6 +59,7 @@ internal class WebCaptureController(
         checkpointController.reset()
         scriptChunks.clear()
         artifactChunks.clear()
+        snapshotCallbacks.clear()
     }
 
     fun updateUserAgent(userAgent: String) {
@@ -64,6 +67,7 @@ internal class WebCaptureController(
     }
 
     fun shutdown() {
+        snapshotCallbacks.clear()
         frameCaptureController.shutdown()
         resourceCapture.shutdown()
     }
@@ -87,9 +91,11 @@ internal class WebCaptureController(
         web.evaluateJavascript(WebResearchScripts.lightSnapshot(nativeCookies), null)
     }
 
-    fun capturePageSnapshot() {
+    fun capturePageSnapshot(onComplete: (() -> Unit)? = null) {
         val nativeCookies = CookieManager.getInstance().getCookie(web.url ?: "") ?: ""
-        web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies), null)
+        val requestId = if (onComplete != null) UUID.randomUUID().toString() else ""
+        if (onComplete != null) snapshotCallbacks[requestId] = onComplete
+        web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies, requestId), null)
     }
 
     fun resetCheckpointWindow() {
@@ -143,6 +149,12 @@ internal class WebCaptureController(
                 )
                 onSnapshot()
                 onChanged()
+                val requestId = snapshot.optString("snapshotRequestId", "")
+                if (requestId.isNotBlank()) {
+                    snapshotCallbacks.remove(requestId)?.let { callback ->
+                        activity.runOnUiThread { callback() }
+                    }
+                }
             } catch (e: Exception) {
                 emitMain(
                     CaptureWarning.create(
