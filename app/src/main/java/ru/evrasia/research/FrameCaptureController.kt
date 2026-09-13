@@ -131,6 +131,7 @@ internal class FrameCaptureController(
             .put("isMainFrame", isMainFrame)
             .put("executionWorld", world)
             .put("frameCaptureMode", "modern")
+            .put("frameIdentityMethod", "sourceOrigin+url+performance.timeOrigin+window.name+topFlag")
 
         when (kind) {
             "frame-ready", "inspector-ready" -> event.put("source", "frame-lifecycle")
@@ -193,7 +194,7 @@ internal class FrameCaptureController(
             var isTop = false;
             try { isTop = window.top === window; } catch (_) {}
             var timeOrigin = 0;
-            try { timeOrigin = Math.round(performance.timeOrigin || 0); } catch (_) {}
+            try { timeOrigin = Number(performance.timeOrigin || 0); } catch (_) {}
             var frameKey = String(location.href) + '|' + String(timeOrigin) + '|' + String(window.name || '') + '|' + (isTop ? 'top' : 'child');
             var seq = 0;
             var active = null;
@@ -316,7 +317,7 @@ internal class FrameCaptureController(
             var bridge = window.$INSPECTOR_BRIDGE;
             if (!bridge || typeof bridge.postMessage !== 'function') return;
             var isTop=false; try { isTop=window.top===window; } catch (_) {}
-            var timeOrigin=0; try { timeOrigin=Math.round(performance.timeOrigin||0); } catch (_) {}
+            var timeOrigin=0; try { timeOrigin=Number(performance.timeOrigin||0); } catch (_) {}
             var frameKey=String(location.href)+'|'+String(timeOrigin)+'|'+String(window.name||'')+'|'+(isTop?'top':'child');
             var ids=new WeakMap(), idSeq=0, snapshots=0, snapshotTimer=0;
             function key(e){ if(!e)return''; var k=ids.get(e); if(k)return k; k='node-'+String(++idSeq).padStart(6,'0'); ids.set(e,k); return k; }
