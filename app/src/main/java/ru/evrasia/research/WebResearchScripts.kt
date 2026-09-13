@@ -5,7 +5,7 @@ import org.json.JSONObject
 internal object WebResearchScripts {
     fun instrumentation(): String = """
           (function(){
-            if(window.__WR10)return; window.__WR10=true;
+            if(window.__WR10===true)return; window.__WR10='installing';
             window.__WR_REQ_HINTS=window.__WR_REQ_HINTS||[];
             const send=o=>{try{EvrasiaResearch.record(JSON.stringify(o))}catch(e){}};
             const warn=(code,message,stage,extra)=>send(Object.assign({source:'capture-warning',time:Date.now(),code:code,message:message,stage:stage,url:location.href},extra||{}));
@@ -17,7 +17,8 @@ internal object WebResearchScripts {
             const chunk=(k,t,s)=>{t=String(t??'');let z=100000,n=Math.max(1,Math.ceil(t.length/z));for(let i=0;i<n;i++){try{s?EvrasiaResearch.scriptChunk(k,i,n,t.slice(i*z,(i+1)*z)):EvrasiaResearch.artifactChunk(k,i,n,t.slice(i*z,(i+1)*z))}catch(e){warn('chunk_bridge_failed','A browser artifact chunk could not be delivered to the native archive.',s?'script-chunk':'artifact-chunk',{artifact:String(k),error:String(e),details:{index:i,total:n,chunkChars:t.slice(i*z,(i+1)*z).length}})}}};
             const target=e=>{if(!e||e.nodeType!==1)return{};return{tag:(e.tagName||'').toLowerCase(),id:e.id||'',className:typeof e.className==='string'?e.className:'',name:e.name||'',type:e.type||'',role:e.getAttribute?.('role')||'',href:e.href||'',text:(e.innerText||e.textContent||'').trim().slice(0,300)}};
             const cpStore=s=>{let values={},total=0,captured=0,truncatedValues=0;try{total=s.length;let limit=Math.min(total,50);for(let i=0;i<limit;i++){let k=s.key(i),v=String(s.getItem(k)??'');if(v.length>4096){v=v.slice(0,4096);truncatedValues++}values[k]=v;captured++}}catch(e){values.__error=String(e)}return{total:total,captured:captured,truncated:total>captured,truncatedValues:truncatedValues,values:values}};
-            const cpKey=(e,i)=>{let t=target(e);return t.id?'id:'+t.id:(t.name?'name:'+t.name:(t.href?'href:'+t.href:(t.role?'role:'+t.role+':'+t.text.slice(0,80):t.tag+':'+String(i??-1)+':'+t.text.slice(0,80))))};
+            const wrPageId=Math.random().toString(36).slice(2,10);const wrElementIds=new WeakMap();let wrElementSeq=0;
+            const cpKey=(e,i)=>{try{if(!e||e.nodeType!==1)return'unknown:'+String(i??-1);let existing=wrElementIds.get(e);if(existing)return existing;let key='element-'+wrPageId+'-'+String(++wrElementSeq).padStart(8,'0');wrElementIds.set(e,key);return key}catch(x){return'unknown:'+String(i??-1)}};
             const cpRect=e=>{try{let r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,top:r.top,left:r.left,right:r.right,bottom:r.bottom}}catch(x){return{}}};
             const cpRuntime=(e,d=document)=>{let o={};try{if('value'in e)o.value=String(e.value??'').slice(0,4096);if('checked'in e)o.checked=!!e.checked;if('indeterminate'in e)o.indeterminate=!!e.indeterminate;if('selected'in e)o.selected=!!e.selected;if('selectedIndex'in e)o.selectedIndex=Number(e.selectedIndex);if(e.selectedOptions)o.selectedValues=Array.from(e.selectedOptions).slice(0,100).map(x=>String(x.value??x.text??'').slice(0,1024));if('disabled'in e)o.disabled=!!e.disabled;if('readOnly'in e)o.readOnly=!!e.readOnly;o.focused=d.activeElement===e;if(typeof e.selectionStart==='number'){o.selectionStart=e.selectionStart;o.selectionEnd=e.selectionEnd;o.selectionDirection=e.selectionDirection||''}}catch(x){o.error=String(x)}return o};
             const cpElement=(e,i,d=document)=>Object.assign({key:cpKey(e,i),runtime:cpRuntime(e,d),rect:cpRect(e)},target(e));
@@ -28,9 +29,12 @@ internal object WebResearchScripts {
             const cpDocState=(d,w,depth=0)=>{let all=[],domLimit=depth?150:500;try{all=Array.from(d.querySelectorAll('a,button,input,select,textarea,option,form,[role],[onclick]'))}catch(e){};let captured=all.slice(0,domLimit).map((e,i)=>cpElement(e,i,d)),frames=[],frameTotal=0,frameSnapshots=0;try{let frameList=Array.from(d.querySelectorAll('iframe,frame'));frameTotal=frameList.length;for(const [i,f] of frameList.slice(0,50).entries()){let item={key:cpKey(f,i),id:f.id||'',name:f.name||'',src:f.src||f.getAttribute?.('src')||'',sandbox:f.getAttribute?.('sandbox')||'',allow:f.getAttribute?.('allow')||'',loading:f.getAttribute?.('loading')||'',rect:cpRect(f),sameOrigin:false};try{let fd=f.contentDocument,fw=f.contentWindow;if(fd&&fw){let frameUrl=String(fw.location.href||'');item.sameOrigin=true;item.url=frameUrl;item.title=fd.title||'';if(depth<1&&frameSnapshots<10){item.snapshot=cpDocState(fd,fw,depth+1);frameSnapshots++}else if(depth<1)item.snapshotOmitted='same-origin-frame-snapshot-limit'}}catch(e){item.accessError=String(e)}frames.push(item)}}catch(e){frames=[{error:String(e)}]}return{viewport:cpViewport(w),focus:cpFocus(d),selection:cpSelection(d,w),dom:{total:all.length,captured:captured.length,truncated:all.length>captured.length,elements:captured},frames:{total:frameTotal,captured:frames.length,snapshots:frameSnapshots,truncated:frameTotal>frames.length,items:frames},shadowDom:cpShadow(d,depth)}};
             window.__WR_RUNTIME_UI_STATE=()=>cpDocState(document,window,0);
             const cpState=(reason,extra)=>{let ui=window.__WR_RUNTIME_UI_STATE();return{time:Date.now(),reason:String(reason||''),url:location.href,title:document.title,cookie:document.cookie,localStorage:cpStore(localStorage),sessionStorage:cpStore(sessionStorage),viewport:ui.viewport,focus:ui.focus,selection:ui.selection,dom:ui.dom,frames:ui.frames,shadowDom:ui.shadowDom,trigger:extra||{}}};
-            window.__WR_CAPTURE_CHECKPOINT=(reason,extra)=>{try{EvrasiaResearch.checkpoint(String(reason||'manual').slice(0,80),JSON.stringify(cpState(reason,extra)))}catch(e){warn('checkpoint_bridge_failed','A browser checkpoint could not be delivered to the native recorder.','checkpoint',{error:String(e)})}};
-            let wrActionSeq=0;const wrPageId=Math.random().toString(36).slice(2,10);
+            window.__WR_CAPTURE_CHECKPOINT=(reason,extra)=>{try{EvrasiaResearch.checkpoint(String(reason||'manual').slice(0,80),JSON.stringify(cpState(reason,extra)));return true}catch(e){warn('checkpoint_bridge_failed','A browser checkpoint could not be delivered to the native recorder.','checkpoint',{error:String(e)});return false}};
+            let wrActionSeq=0;
             ['click','change','submit'].forEach(type=>window.addEventListener(type,e=>{let info=target(e.target),token='actionctx-'+wrPageId+'-'+String(++wrActionSeq).padStart(8,'0'),ctx={token:token,action:type,target:info,time:Date.now()};window.__WR_ACTIVE_ACTION_CONTEXT=ctx;send({source:'user-action',time:ctx.time,action:type,page:location.href,target:info,browserActionToken:token,eventPhase:e.eventPhase||0});window.__WR_CAPTURE_CHECKPOINT('before-action',{action:type,target:info});setTimeout(()=>{if(window.__WR_ACTIVE_ACTION_CONTEXT===ctx)window.__WR_ACTIVE_ACTION_CONTEXT=null},0);setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT('after-action',{action:type,target:info}),350)},true));
+            let wrInputSeq=0,wrInputTimer=0,wrInputBurst=null,wrInputTarget=null,wrInputLastAt=0;
+            window.addEventListener('beforeinput',e=>{try{let el=e.target;if(!el||!('value'in el))return;let now=Date.now(),fresh=!wrInputBurst||wrInputTarget!==el||(now-wrInputLastAt)>700;if(fresh){let info=target(el),token='inputctx-'+wrPageId+'-'+String(++wrInputSeq).padStart(8,'0');wrInputBurst={token:token,target:info,inputType:String(e.inputType||''),time:now};wrInputTarget=el;send({source:'user-action',time:now,action:'input',page:location.href,target:info,browserActionToken:token,eventPhase:e.eventPhase||0,inputType:String(e.inputType||'')});window.__WR_CAPTURE_CHECKPOINT('before-input',{action:'input',target:info,inputType:String(e.inputType||''),browserActionToken:token})}wrInputLastAt=now}catch(x){}},true);
+            window.addEventListener('input',e=>{try{let el=e.target;if(!el||!('value'in el))return;wrInputTarget=el;wrInputLastAt=Date.now();if(wrInputTimer)clearTimeout(wrInputTimer);let burst=wrInputBurst,info=target(el);wrInputTimer=setTimeout(()=>{window.__WR_CAPTURE_CHECKPOINT('after-input',{action:'input',target:info,inputType:burst?.inputType||'',browserActionToken:burst?.token||''});wrInputTimer=0;wrInputBurst=null;wrInputTarget=null},450)}catch(x){}},true);
             const HP=history.pushState.bind(history),HR=history.replaceState.bind(history);
             history.pushState=function(s,t,u){let r=HP(s,t,u);send({source:'history',time:Date.now(),action:'pushState',url:location.href,state:s});return r};
             history.replaceState=function(s,t,u){let r=HR(s,t,u);send({source:'history',time:Date.now(),action:'replaceState',url:location.href,state:s});return r};
@@ -87,6 +91,7 @@ internal object WebResearchScripts {
             new MutationObserver(ms=>{const ac=window.__WR_ACTIVE_ACTION_CONTEXT||null;if(ac)mutationActionContext=ac;for(const m of ms){if(m.type==='attributes'){mutationAttributes++;continue}mutationAdded+=m.addedNodes?.length||0;mutationRemoved+=m.removedNodes?.length||0;for(const n of Array.from(m.addedNodes||[])){if(!n||n.nodeType!==1)continue;if(String(n.tagName||'').toLowerCase()==='script')archiveScript(n,location.href+'#inline-dynamic-'+(++dynamicInline));try{if(n.querySelectorAll)n.querySelectorAll('script').forEach(s=>archiveScript(s,location.href+'#inline-dynamic-'+(++dynamicInline)))}catch(e){}}}if(!mutationTimer)mutationTimer=setTimeout(flushMutations,1000)}).observe(document.documentElement,{subtree:true,childList:true,attributes:true});
             addEventListener('error',e=>{send({source:'js-error',time:Date.now(),message:e.message,url:e.filename||location.href,line:e.lineno||0,column:e.colno||0});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-js-error',{message:String(e.message||'')}),0)});
             addEventListener('unhandledrejection',e=>{send({source:'promise-rejection',time:Date.now(),message:String(e.reason)});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-promise-rejection',{message:String(e.reason||'')}),0)});
+            window.__WR10=true;
             send({source:'hook',time:Date.now(),url:location.href,status:0});
           })();
         """.trimIndent()
@@ -95,11 +100,15 @@ internal object WebResearchScripts {
           (function(){
             try{
               if(window.__WR_CAPTURE_CHECKPOINT){
-                window.__WR_CAPTURE_CHECKPOINT(${JSONObject.quote(reason)},{source:'native-request'});
+                return window.__WR_CAPTURE_CHECKPOINT(${JSONObject.quote(reason)},{source:'native-request'})===true;
               }
             }catch(e){}
+            return false;
           })();
         """.trimIndent()
+
+    fun instrumentedCheckpoint(reason: String): String =
+        instrumentation() + "\n" + checkpoint(reason)
 
     fun lightSnapshot(nativeCookies: String): String = """
           (function(){

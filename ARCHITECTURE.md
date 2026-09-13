@@ -74,6 +74,10 @@ Forensic relations теперь извлекают JavaScript initiator из `in
 
 Лимиты checkpoint capture сбрасываются при старте каждой ZIP-записи: до 80 checkpoints и 80 viewport screenshots на recording window. Поэтому навигация до нажатия «Запись ZIP» больше не расходует ёмкость исследовательского окна. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
 
+Начиная с v47 semantic checkpoints не отбрасываются по временному throttle: соседние `click` / `submit` / network / recording boundary события сохраняются независимо от интервала между ними, пока не достигнут явный лимит recording window. Native boundary capture выполняет instrumentation и checkpoint одним JavaScript-вызовом и повторяет запрос только если capture явно не подтвердился; после исчерпания повторов создаётся явный `native-fallback` checkpoint с URL/title/native cookie/screenshot и `capture-warning`, поэтому recording boundary не исчезает молча. Для form input используется burst-модель: `beforeinput` создаёт `before-input`, а после 450 мс тишины создаётся `after-input`, поэтому ввод не порождает checkpoint на каждый символ.
+
+Runtime DOM element keys в checkpoint state теперь назначаются через page-local `WeakMap`: один живой DOM node сохраняет стабильный ID между снимками, а разные элементы получают разные IDs даже при одинаковых `href`, `name`, тексте или роли. Это устраняет collision/instability в `checkpoint-diffs.json` внутри одного document lifetime.
+
 `checkpoints/index.json` описывает точки, а `checkpoint-diffs.json` содержит производные изменения cookies, storage и DOM между соседними checkpoints. Screenshot/state artifacts лежат в `checkpoints/<checkpointId>/`.
 
 ## Runtime UI state

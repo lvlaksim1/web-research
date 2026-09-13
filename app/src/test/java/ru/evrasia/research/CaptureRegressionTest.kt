@@ -172,6 +172,31 @@ class CaptureRegressionTest {
     }
 
     @Test
+    fun runtimeInstrumentationUsesStableUniqueElementIdsAndDebouncedInputCheckpoints() {
+        val script = WebResearchScripts.instrumentation()
+
+        assertTrue(script.contains("const wrElementIds=new WeakMap()"))
+        assertTrue(script.contains("element-'+wrPageId+'-"))
+        assertFalse(script.contains("return t.id?'id:'"))
+        assertTrue(script.contains("addEventListener('beforeinput'"))
+        assertTrue(script.contains("'before-input'"))
+        assertTrue(script.contains("'after-input'"))
+        assertTrue(script.contains("setTimeout(()=>{window.__WR_CAPTURE_CHECKPOINT('after-input'"))
+    }
+
+    @Test
+    fun nativeCheckpointScriptInstallsInstrumentationAndReportsCaptureSuccess() {
+        val script = WebResearchScripts.instrumentedCheckpoint("recording-start")
+
+        assertTrue(script.contains("window.__WR10='installing'"))
+        assertTrue(script.contains("window.__WR10=true"))
+        assertTrue(script.contains("recording-start"))
+        assertTrue(script.contains("return window.__WR_CAPTURE_CHECKPOINT"))
+        assertTrue(script.contains("return true"))
+        assertTrue(script.contains("return false"))
+    }
+
+    @Test
     fun recordingWindowKeepsEarlierSupportingAssetsAndFiltersCookieTrace() {
         val archive = ResearchArchive()
         val base = System.currentTimeMillis()

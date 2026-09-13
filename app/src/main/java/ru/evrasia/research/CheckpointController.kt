@@ -21,27 +21,67 @@ internal class CheckpointController(
         private const val MAX_CHECKPOINTS = 80
         private const val MAX_SCREENSHOTS = 80
         private const val MAX_STATE_CHARS = 1_500_000
-        private const val MIN_INTERVAL_MS = 120L
         private const val MAX_SCREENSHOT_PIXELS = 1_800_000.0
     }
 
     private var checkpointCount = 0
     private var screenshotCount = 0
-    private var lastCheckpointAt = 0L
     private var checkpointLimitWarningSent = false
     private var screenshotLimitWarningSent = false
 
     fun reset() {
         checkpointCount = 0
         screenshotCount = 0
-        lastCheckpointAt = 0L
         checkpointLimitWarningSent = false
         screenshotLimitWarningSent = false
     }
 
-    fun request(reason: String) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        web.evaluateJavascript(WebResearchScripts.checkpoint(reason), null)
+    fun captureNativeFallback(reason: String) {
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            val page = web.url.orEmpty()
+            val state = JSONObject()
+                .put("time", System.currentTimeMillis())
+                .put("reason", reason)
+                .put("url", page)
+                .put("title", web.title.orEmpty())
+                .put("cookie", "")
+                .put("localStorage", JSONObject().put("values", JSONObject()))
+                .put("sessionStorage", JSONObject().put("values", JSONObject()))
+                .put("viewport", JSONObject()
+                    .put("nativeWidth", web.width)
+                    .put("nativeHeight", web.height))
+                .put("focus", JSONObject())
+                .put("selection", JSONObject())
+                .put("dom", JSONObject()
+                    .put("total", 0)
+                    .put("captured", 0)
+                    .put("truncated", false)
+                    .put("elements", org.json.JSONArray()))
+                .put("frames", JSONObject()
+                    .put("total", 0)
+                    .put("captured", 0)
+                    .put("snapshots", 0)
+                    .put("truncated", false)
+                    .put("items", org.json.JSONArray()))
+                .put("shadowDom", JSONObject()
+                    .put("captured", 0)
+                    .put("truncated", false)
+                    .put("roots", org.json.JSONArray()))
+                .put("captureMode", "native-fallback")
+                .put("trigger", JSONObject().put("source", "native-fallback"))
+
+            record(
+                CaptureWarning.create(
+                    code = "checkpoint_browser_state_unavailable",
+                    message = "Browser checkpoint state was unavailable after retries; a native boundary fallback was captured.",
+                    stage = "checkpoint",
+                    url = page,
+                    details = JSONObject().put("reason", reason.take(80))
+                )
+            )
+            captureOnUi(reason, state)
+        }
     }
 
     fun captureFromBrowser(reason: String, json: String) {
@@ -84,8 +124,6 @@ internal class CheckpointController(
 
     private fun captureOnUi(reason: String, state: JSONObject) {
         if (activity.isFinishing || activity.isDestroyed) return
-        val now = System.currentTimeMillis()
-
         if (checkpointCount >= MAX_CHECKPOINTS) {
             if (!checkpointLimitWarningSent) {
                 checkpointLimitWarningSent = true
@@ -102,7 +140,6 @@ internal class CheckpointController(
             return
         }
 
-        if (now - lastCheckpointAt < MIN_INTERVAL_MS) return
 
         val page = state.optString("url", web.url ?: "")
         state.put("nativeCookie", CookieManager.getInstance().getCookie(page).orEmpty())
@@ -127,7 +164,6 @@ internal class CheckpointController(
 
         archive.addCheckpoint(reason.take(80), state, screenshot)
         checkpointCount++
-        lastCheckpointAt = now
         onChanged()
     }
 
