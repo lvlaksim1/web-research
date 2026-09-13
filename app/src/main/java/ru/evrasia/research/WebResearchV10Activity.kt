@@ -390,12 +390,21 @@ class WebResearchV10Activity : AppCompatActivity() {
             return
         }
 
+        val activeId = windowController.active()?.windowId
         val remaining = AtomicInteger(runtimes.size)
         val completeOne: () -> Unit = {
-            if (remaining.decrementAndGet() == 0) onReady()
+            if (remaining.decrementAndGet() == 0) {
+                activeId?.let { id ->
+                    archive.extraArtifacts["windows/$id/page-snapshot.json"]?.let { bytes ->
+                        runCatching { JSONObject(bytes.toString(Charsets.UTF_8)) }
+                            .getOrNull()
+                            ?.let { archive.updateSnapshot(it) }
+                    }
+                }
+                onReady()
+            }
         }
 
-        val activeId = windowController.active()?.windowId
         runtimes.filter { it.windowId != activeId }.forEach {
             it.captureController.capturePageSnapshot(completeOne)
         }
