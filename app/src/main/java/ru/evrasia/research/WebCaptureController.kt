@@ -24,11 +24,19 @@ internal class WebCaptureController(
         record = record,
         onChanged = onChanged
     )
+    private val checkpointController = CheckpointController(
+        activity = activity,
+        web = web,
+        archive = archive,
+        record = record,
+        onChanged = onChanged
+    )
 
     val bridge = Bridge()
 
     fun clearPending() {
         resourceCapture.clearPending()
+        checkpointController.reset()
         scriptChunks.clear()
         artifactChunks.clear()
     }
@@ -65,6 +73,11 @@ internal class WebCaptureController(
         web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies), null)
     }
 
+    fun captureCheckpoint(reason: String) {
+        ensureInstrumentation()
+        checkpointController.request(reason)
+    }
+
     inner class Bridge {
         @JavascriptInterface fun record(json: String) {
             try {
@@ -94,6 +107,10 @@ internal class WebCaptureController(
                     details = JSONObject().put("payloadChars", json.length)
                 ))
             }
+        }
+
+        @JavascriptInterface fun checkpoint(reason: String, json: String) {
+            checkpointController.captureFromBrowser(reason, json)
         }
 
         @JavascriptInterface fun externalScript(url: String) {

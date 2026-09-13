@@ -93,6 +93,7 @@ internal class WebResearchWebViewController(
                 installUrlObserver()
                 extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_idle")
                 captureController.ensureInstrumentation(); captureController.captureLightPageSnapshot()
+                handler.postDelayed({ captureController.captureCheckpoint("after-navigation") }, 450)
             }
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 request?.let {

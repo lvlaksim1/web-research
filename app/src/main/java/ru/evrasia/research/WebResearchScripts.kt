@@ -16,7 +16,11 @@ internal object WebResearchScripts {
             const isTextual=ct=>!ct||/json|text|javascript|ecmascript|css|html|xml|x-www-form-urlencoded|graphql/.test(String(ct).toLowerCase());
             const chunk=(k,t,s)=>{t=String(t??'');let z=100000,n=Math.max(1,Math.ceil(t.length/z));for(let i=0;i<n;i++){try{s?EvrasiaResearch.scriptChunk(k,i,n,t.slice(i*z,(i+1)*z)):EvrasiaResearch.artifactChunk(k,i,n,t.slice(i*z,(i+1)*z))}catch(e){warn('chunk_bridge_failed','A browser artifact chunk could not be delivered to the native archive.',s?'script-chunk':'artifact-chunk',{artifact:String(k),error:String(e),details:{index:i,total:n,chunkChars:t.slice(i*z,(i+1)*z).length}})}}};
             const target=e=>{if(!e||e.nodeType!==1)return{};return{tag:(e.tagName||'').toLowerCase(),id:e.id||'',className:typeof e.className==='string'?e.className:'',name:e.name||'',type:e.type||'',role:e.getAttribute?.('role')||'',href:e.href||'',text:(e.innerText||e.textContent||'').trim().slice(0,300)}};
-            ['click','change','submit'].forEach(type=>document.addEventListener(type,e=>send({source:'user-action',time:Date.now(),action:type,page:location.href,target:target(e.target)}),true));
+            const cpStore=s=>{let values={},total=0,captured=0,truncatedValues=0;try{total=s.length;let limit=Math.min(total,50);for(let i=0;i<limit;i++){let k=s.key(i),v=String(s.getItem(k)??'');if(v.length>4096){v=v.slice(0,4096);truncatedValues++}values[k]=v;captured++}}catch(e){values.__error=String(e)}return{total:total,captured:captured,truncated:total>captured,truncatedValues:truncatedValues,values:values}};
+            const cpElement=(e,i)=>{let t=target(e),key=t.id?'id:'+t.id:(t.name?'name:'+t.name:(t.href?'href:'+t.href:(t.role?'role:'+t.role+':'+t.text.slice(0,80):t.tag+':'+i+':'+t.text.slice(0,80))));return Object.assign({key:key},t)};
+            const cpState=(reason,extra)=>{let all=[];try{all=Array.from(document.querySelectorAll('a,button,input,select,textarea,form,[role],[onclick]'))}catch(e){};let captured=all.slice(0,500).map(cpElement);return{time:Date.now(),reason:String(reason||''),url:location.href,title:document.title,cookie:document.cookie,localStorage:cpStore(localStorage),sessionStorage:cpStore(sessionStorage),dom:{total:all.length,captured:captured.length,truncated:all.length>captured.length,elements:captured},trigger:extra||{}}};
+            window.__WR_CAPTURE_CHECKPOINT=(reason,extra)=>{try{EvrasiaResearch.checkpoint(String(reason||'manual').slice(0,80),JSON.stringify(cpState(reason,extra)))}catch(e){warn('checkpoint_bridge_failed','A browser checkpoint could not be delivered to the native recorder.','checkpoint',{error:String(e)})}};
+            ['click','change','submit'].forEach(type=>document.addEventListener(type,e=>{let info=target(e.target);send({source:'user-action',time:Date.now(),action:type,page:location.href,target:info});window.__WR_CAPTURE_CHECKPOINT('before-action',{action:type,target:info});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT('after-action',{action:type,target:info}),350)},true));
             const HP=history.pushState.bind(history),HR=history.replaceState.bind(history);
             history.pushState=function(s,t,u){let r=HP(s,t,u);send({source:'history',time:Date.now(),action:'pushState',url:location.href,state:s});return r};
             history.replaceState=function(s,t,u){let r=HR(s,t,u);send({source:'history',time:Date.now(),action:'replaceState',url:location.href,state:s});return r};
@@ -42,6 +46,7 @@ internal object WebResearchScripts {
                   if(isTextual(ct)){try{responseBody=await r.clone().text()}catch(e){responseBody='[unavailable]'}}else responseBody='[binary]';
                   let responseSize=-1;try{responseSize=new TextEncoder().encode(responseBody).length}catch(e){responseSize=responseBody.length}
                   send({source:'fetch',time:t,duration:Date.now()-t,method:m,url:u,finalUrl:r.url||u,requestHeaders:rqHeaders,requestMimeType:rqHeaders['content-type']||'',requestBody:body,status:r.status,statusText:r.statusText,redirected:!!r.redirected,responseType:r.type||'',responseHeaders:rh,responseBody:responseBody,mimeType:ct,responseSize:responseSize,initiatorStack:stack});
+                  if(/^(POST|PUT|PATCH|DELETE)$/.test(m))setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-network',{transport:'fetch',method:m,url:u,status:r.status}),0);
                   return r
                 }catch(e){send({source:'fetch',time:t,duration:Date.now()-t,method:m,url:u,requestHeaders:rqHeaders,requestMimeType:rqHeaders['content-type']||'',requestBody:body,initiatorStack:stack,error:String(e)});throw e}
               };
@@ -56,7 +61,7 @@ internal object WebResearchScripts {
                 XP.setRequestHeader=function(k,v){try{this.__wrHeaders[String(k).toLowerCase()]=String(v)}catch(e){};return H.apply(this,arguments)};
                 XP.send=function(b){
                   const x=this,t=Date.now(),m=x.__wrMethod||'GET',u=x.__wrUrl||'';let stack='';try{stack=(new Error()).stack||''}catch(e){};const body=bodyPreview(b);remember(u,m,t);
-                  x.addEventListener('loadend',()=>{let responseBody='[binary]';try{if(x.responseType===''||x.responseType==='text')responseBody=x.responseText}catch(e){};let ct='';try{ct=x.getResponseHeader('content-type')||''}catch(e){};send({source:'xhr',time:t,duration:Date.now()-t,method:m,url:u,finalUrl:x.responseURL||u,requestHeaders:x.__wrHeaders||{},requestMimeType:(x.__wrHeaders||{})['content-type']||'',requestBody:body,status:x.status,statusText:x.statusText,responseType:x.responseType||'',responseHeadersRaw:x.getAllResponseHeaders(),responseBody:responseBody,mimeType:ct,initiatorStack:stack})},{once:true});
+                  x.addEventListener('loadend',()=>{let responseBody='[binary]';try{if(x.responseType===''||x.responseType==='text')responseBody=x.responseText}catch(e){};let ct='';try{ct=x.getResponseHeader('content-type')||''}catch(e){};send({source:'xhr',time:t,duration:Date.now()-t,method:m,url:u,finalUrl:x.responseURL||u,requestHeaders:x.__wrHeaders||{},requestMimeType:(x.__wrHeaders||{})['content-type']||'',requestBody:body,status:x.status,statusText:x.statusText,responseType:x.responseType||'',responseHeadersRaw:x.getAllResponseHeaders(),responseBody:responseBody,mimeType:ct,initiatorStack:stack});if(/^(POST|PUT|PATCH|DELETE)$/.test(m))setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-network',{transport:'xhr',method:m,url:u,status:x.status}),0)},{once:true});
                   return S.apply(this,arguments)
                 };
               }
@@ -70,9 +75,19 @@ internal object WebResearchScripts {
             let mutationAdded=0,mutationRemoved=0,mutationAttributes=0,mutationTimer=0;
             const flushMutations=()=>{mutationTimer=0;if(!(mutationAdded||mutationRemoved||mutationAttributes))return;send({source:'dom-mutation',time:Date.now(),page:location.href,mutations:[{type:'batch',added:mutationAdded,removed:mutationRemoved,attributes:mutationAttributes}]});mutationAdded=0;mutationRemoved=0;mutationAttributes=0};
             new MutationObserver(ms=>{for(const m of ms){if(m.type==='attributes'){mutationAttributes++;continue}mutationAdded+=m.addedNodes?.length||0;mutationRemoved+=m.removedNodes?.length||0;for(const n of Array.from(m.addedNodes||[])){if(!n||n.nodeType!==1)continue;if(String(n.tagName||'').toLowerCase()==='script')archiveScript(n,location.href+'#inline-dynamic-'+(++dynamicInline));try{if(n.querySelectorAll)n.querySelectorAll('script').forEach(s=>archiveScript(s,location.href+'#inline-dynamic-'+(++dynamicInline)))}catch(e){}}}if(!mutationTimer)mutationTimer=setTimeout(flushMutations,1000)}).observe(document.documentElement,{subtree:true,childList:true,attributes:true});
-            addEventListener('error',e=>send({source:'js-error',time:Date.now(),message:e.message,url:e.filename||location.href,line:e.lineno||0,column:e.colno||0}));
-            addEventListener('unhandledrejection',e=>send({source:'promise-rejection',time:Date.now(),message:String(e.reason)}));
+            addEventListener('error',e=>{send({source:'js-error',time:Date.now(),message:e.message,url:e.filename||location.href,line:e.lineno||0,column:e.colno||0});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-js-error',{message:String(e.message||'')}),0)});
+            addEventListener('unhandledrejection',e=>{send({source:'promise-rejection',time:Date.now(),message:String(e.reason)});setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT?.('after-promise-rejection',{message:String(e.reason||'')}),0)});
             send({source:'hook',time:Date.now(),url:location.href,status:0});
+          })();
+        """.trimIndent()
+
+    fun checkpoint(reason: String): String = """
+          (function(){
+            try{
+              if(window.__WR_CAPTURE_CHECKPOINT){
+                window.__WR_CAPTURE_CHECKPOINT(${JSONObject.quote(reason)},{source:'native-request'});
+              }
+            }catch(e){}
           })();
         """.trimIndent()
 

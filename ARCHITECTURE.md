@@ -48,6 +48,22 @@ debugger projection / display
 
 В ZIP эти данные дополнительно представлены как производные `timeline.json` и `relations.json`. Временная корреляция является inference и не выдаётся за доказанную JavaScript-causality; точная причинность относится к отдельному следующему слою.
 
+## Checkpoints и before/after diff
+
+Этап checkpoints добавляет ограниченные по памяти снимки состояния в ключевых точках сессии. `CheckpointController` принимает browser-side state, добавляет native cookies, делает ограниченный viewport screenshot и сохраняет checkpoint через `ResearchArchive.addCheckpoint`.
+
+Автоматические точки создаются:
+
+- перед и после `click` / `change` / `submit`;
+- после завершения изменяющих `POST` / `PUT` / `PATCH` / `DELETE` через fetch/XHR;
+- после navigation;
+- после JS error / unhandled promise rejection;
+- при старте и остановке ZIP-recording.
+
+Для защиты памяти действует лимит 40 checkpoints и 24 screenshots на сессию. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
+
+`checkpoints/index.json` описывает точки, а `checkpoint-diffs.json` содержит производные изменения cookies, storage и DOM между соседними checkpoints. Screenshot/state artifacts лежат в `checkpoints/<checkpointId>/`.
+
 ## Browser / capture слой
 
 - `WebResearchV10Activity` — lifecycle и верхнеуровневая оркестрация браузера. Она связывает контроллеры, но не должна содержать большие UI-подсистемы или capture-алгоритмы.
@@ -79,6 +95,8 @@ debugger projection / display
 - `session-manifest.json`;
 - `timeline.json` — компактная хронология forensic events без тяжёлых bodies;
 - `relations.json` — производные action/request/mutation связи и уровень доказательности;
+- `checkpoints/index.json` и `checkpoint-diffs.json`;
+- `checkpoints/<checkpointId>/state.json` и ограниченные viewport screenshots;
 - `raw-events.json`;
 - `network.har`;
 - `api-summary.json`;
