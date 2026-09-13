@@ -91,7 +91,7 @@ internal class ExtensionManagerUi(
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(2), 0, dp(4))
         }
-        scroll.addView(list, ScrollView.LayoutParams(-1, -2))
+        scroll.addView(list, android.view.ViewGroup.LayoutParams(-1, -2))
         panel.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         renderExtensions(list, dialog, palette)
