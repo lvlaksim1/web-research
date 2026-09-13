@@ -26,6 +26,7 @@ class CaptureRegressionTest {
             .put("source", "user-action")
             .put("time", 1_000L)
             .put("action", "click")
+            .put("browserActionToken", "ctx-1")
             .put("page", "https://example.test/app"))
         archive.addRecord(JSONObject()
             .put("source", "webview")
@@ -38,6 +39,8 @@ class CaptureRegressionTest {
             .put("duration", 120L)
             .put("method", "POST")
             .put("url", "https://example.test/api/save")
+            .put("browserActionToken", "ctx-1")
+            .put("initiatorStack", "Error\n    at XP.send (<anonymous>:57:97)\n    at clickHandler (https://example.test/app.js:42:7)")
             .put("status", 200))
         archive.addRecord(JSONObject()
             .put("source", "dom-mutation")
@@ -53,6 +56,7 @@ class CaptureRegressionTest {
         assertTrue(action.getString("actionId").startsWith("action-"))
         assertEquals(webview.getString("requestId"), fetch.getString("requestId"))
         assertEquals(action.getString("actionId"), fetch.getString("relatedActionId"))
+        assertEquals("observed-browser-event-context", fetch.getString("actionRelation"))
         assertEquals(fetch.getString("requestId"), mutation.getString("relatedRequestId"))
         assertEquals("temporal-nearest", mutation.getString("requestRelation"))
         assertTrue(mutation.getString("mutationId").startsWith("mutation-"))
@@ -64,8 +68,13 @@ class CaptureRegressionTest {
         val relations = ForensicTimelineExport.buildRelations(archive)
         assertEquals(1, relations.getJSONArray("actions").length())
         assertEquals(1, relations.getJSONArray("requests").length())
+        assertEquals(1, relations.getJSONArray("initiators").length())
+        assertEquals(1, relations.getJSONArray("causalityChains").length())
+        assertTrue(relations.getJSONArray("initiators").getJSONObject(0).getString("frame").contains("clickHandler"))
+        assertFalse(relations.getJSONArray("initiators").getJSONObject(0).getString("frame").contains("XP.send"))
+        assertEquals("observed-browser-event-context", relations.getJSONArray("causalityChains").getJSONObject(0).getString("actionRelation"))
         assertEquals(1, relations.getJSONArray("mutations").length())
-        assertTrue(relations.getJSONArray("links").length() >= 2)
+        assertTrue(relations.getJSONArray("links").length() >= 3)
         assertTrue(relations.getJSONObject("relationPolicy").getString("temporal-nearest").contains("not proof"))
     }
 
@@ -119,6 +128,37 @@ class CaptureRegressionTest {
         assertTrue(entries.containsKey("checkpoints/$beforeId/state.json"))
         assertTrue(entries.containsKey("checkpoints/$afterId/state.json"))
         assertTrue(entries.containsKey("checkpoints/$afterId/screenshot.jpg"))
+    }
+
+    @Test
+    fun recordingWindowKeepsEarlierSupportingAssetsAndFiltersCookieTrace() {
+        val archive = ResearchArchive()
+        val base = System.currentTimeMillis()
+
+        archive.putScript("https://example.test/app.js", "console.log('support')".toByteArray())
+        archive.putResource(
+            "https://example.test/app.css",
+            "body{}".toByteArray(),
+            JSONObject().put("contentType", "text/css")
+        )
+        archive.putArtifact(
+            "cookie-trace.json",
+            JSONObject()
+                .put("format", "evrasia-cookie-trace-v2")
+                .put("events", JSONArray()
+                    .put(JSONObject().put("time", base - 500L).put("name", "before"))
+                    .put(JSONObject().put("time", base + 500L).put("name", "inside")))
+                .toString()
+                .toByteArray()
+        )
+
+        val window = archive.snapshotWindow(base, base + 1_000L)
+
+        assertTrue(window.scripts.containsKey("https://example.test/app.js"))
+        assertTrue(window.resources.containsKey("https://example.test/app.css"))
+        val trace = JSONObject(requireNotNull(window.extraArtifacts["cookie-trace.json"]).toString(Charsets.UTF_8))
+        assertEquals(1, trace.getJSONArray("events").length())
+        assertEquals("inside", trace.getJSONArray("events").getJSONObject(0).getString("name"))
     }
 
     @Test
@@ -323,7 +363,9 @@ class CaptureRegressionTest {
         val relations = JSONObject(entries.getValue("relations.json").toString(Charsets.UTF_8))
         assertEquals(archive.forensicSessionId, relations.getString("sessionId"))
         val har = JSONObject(entries.getValue("network.har").toString(Charsets.UTF_8))
-        assertTrue(har.getJSONObject("log").getJSONArray("entries").length() >= 3)
+        assertEquals(3, har.getJSONObject("log").getJSONArray("entries").length())
+        val api = JSONObject(entries.getValue("api-summary.json").toString(Charsets.UTF_8))
+        assertEquals(4, api.getInt("endpointCount"))
         val manifest = JSONObject(entries.getValue("session-manifest.json").toString(Charsets.UTF_8))
         assertEquals(1, manifest.getInt("schemaVersion"))
         assertEquals(events.length(), manifest.getJSONObject("counters").getInt("rawEvents"))
@@ -336,6 +378,8 @@ class CaptureRegressionTest {
         assertTrue(manifest.getJSONObject("advancedChannels").getJSONObject("sourceMaps").getJSONArray("hints").toString().contains("app.js.map"))
         assertTrue(manifest.getJSONObject("advancedChannels").getJSONObject("connectionDiagnostics").getString("dns").contains("unavailable"))
         assertTrue(manifest.getJSONObject("forensic").getBoolean("allRawEventsHaveEventId"))
+        assertEquals(80, manifest.getJSONObject("limits").getInt("checkpointsPerRecordingWindow"))
+        assertEquals(40, manifest.getJSONObject("limits").getInt("checkpointScreenshotsPerRecordingWindow"))
         assertTrue(manifest.getJSONObject("completeness").getBoolean("pageHtmlCaptured"))
         assertFalse(manifest.getJSONObject("completeness").getBoolean("fullSnapshotCaptured"))
         assertTrue(
