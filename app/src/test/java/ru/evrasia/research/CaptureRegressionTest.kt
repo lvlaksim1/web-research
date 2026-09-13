@@ -194,6 +194,9 @@ class CaptureRegressionTest {
         assertTrue(script.contains("return window.__WR_CAPTURE_CHECKPOINT"))
         assertTrue(script.contains("return true"))
         assertTrue(script.contains("return false"))
+
+        val fullSnapshot = WebResearchScripts.fullSnapshot("", "snapshot-request-1")
+        assertTrue(fullSnapshot.contains("snapshotRequestId:\"snapshot-request-1\""))
     }
 
     @Test
