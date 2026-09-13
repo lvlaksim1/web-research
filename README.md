@@ -43,6 +43,7 @@ Android WebView-инструмент для максимально полног�
 Основной результат исследования — ZIP текущей сессии. В него входят, в частности:
 
 - `session-manifest.json` — counters, completeness indicators, фактические предупреждения и явные capture limits;
+- `session-manifest.json` также содержит `advancedChannels`: Service Worker, WebSocket/SSE, performance coverage, source-map hints и явные ограничения DNS/TLS/Worker runtime;
 - `timeline.json` — компактная единая временная шкала с event/action/request/mutation ID;
 - `relations.json` — производные связи action → request → DOM mutation с указанием метода корреляции;
 - `relations.json` также содержит JS initiators и causality chains: action → initiator stack → request → DOM mutation, с отдельной маркировкой observed/inferred;

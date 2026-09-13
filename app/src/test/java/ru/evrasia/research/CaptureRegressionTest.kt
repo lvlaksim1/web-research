@@ -278,8 +278,11 @@ class CaptureRegressionTest {
         for (index in 0 until events.length()) {
             archive.addRecord(JSONObject(events.getJSONObject(index).toString()))
         }
-        archive.updateSnapshot(JSONObject().put("html", "<html><body>fixture</body></html>"))
-        archive.putScript("https://example.test/app.js", "console.log('fixture')".toByteArray())
+        archive.updateSnapshot(JSONObject()
+            .put("html", "<html><body>fixture</body></html>")
+            .put("serviceWorkers", JSONArray().put(JSONObject().put("scope", "https://example.test/").put("active", "https://example.test/sw.js")))
+            .put("resources", JSONArray().put(JSONObject().put("name", "https://example.test/app.js"))))
+        archive.putScript("https://example.test/app.js", "console.log('fixture')\n//# sourceMappingURL=app.js.map".toByteArray())
         archive.putResource(
             "https://example.test/logo.png",
             byteArrayOf(1, 2, 3, 4),
@@ -328,6 +331,10 @@ class CaptureRegressionTest {
         assertEquals(1, manifest.getJSONObject("counters").getInt("resourcesArchived"))
         assertEquals(1, manifest.getJSONObject("counters").getInt("browserArtifacts"))
         assertEquals(events.length(), manifest.getJSONObject("counters").getInt("forensicEventIds"))
+        assertEquals(1, manifest.getJSONObject("counters").getInt("sourceMapHints"))
+        assertEquals(1, manifest.getJSONObject("counters").getInt("serviceWorkerRegistrations"))
+        assertTrue(manifest.getJSONObject("advancedChannels").getJSONObject("sourceMaps").getJSONArray("hints").toString().contains("app.js.map"))
+        assertTrue(manifest.getJSONObject("advancedChannels").getJSONObject("connectionDiagnostics").getString("dns").contains("unavailable"))
         assertTrue(manifest.getJSONObject("forensic").getBoolean("allRawEventsHaveEventId"))
         assertTrue(manifest.getJSONObject("completeness").getBoolean("pageHtmlCaptured"))
         assertFalse(manifest.getJSONObject("completeness").getBoolean("fullSnapshotCaptured"))
