@@ -383,10 +383,25 @@ class WebResearchV10Activity : AppCompatActivity() {
         if (::captureController.isInitialized) captureController.ensureInstrumentation()
     }
 
-    private fun capturePageSnapshots() {
+    private fun capturePageSnapshots(onReady: () -> Unit) {
+        val runtimes = windowRuntimes.values.toList()
+        if (runtimes.isEmpty()) {
+            onReady()
+            return
+        }
+
+        val remaining = AtomicInteger(runtimes.size)
+        val completeOne: () -> Unit = {
+            if (remaining.decrementAndGet() == 0) onReady()
+        }
+
         val activeId = windowController.active()?.windowId
-        windowRuntimes.values.filter { it.windowId != activeId }.forEach { it.captureController.capturePageSnapshot() }
-        activeId?.let { windowRuntimes[it]?.captureController?.capturePageSnapshot() }
+        runtimes.filter { it.windowId != activeId }.forEach {
+            it.captureController.capturePageSnapshot(completeOne)
+        }
+        activeId?.let { id ->
+            windowRuntimes[id]?.captureController?.capturePageSnapshot(completeOne)
+        }
     }
 
     private fun addRecord(record: JSONObject) {
