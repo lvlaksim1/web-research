@@ -24,6 +24,7 @@ internal class WebResearchMenuController(
     private val activity: AppCompatActivity,
     private val bookmarkController: WebBookmarkController,
     private val webViewController: WebResearchWebViewController,
+    private val onExtensions: () -> Unit,
     private val paletteProvider: () -> WebUiTheme.Palette,
     private val currentPageProvider: () -> String,
     private val onAccentColor: (Int, Boolean) -> Unit
@@ -64,6 +65,10 @@ internal class WebResearchMenuController(
             }
 
             addSection("ПРИЛОЖЕНИЕ")
+            addMenuRow(TechIconDrawable.Kind.INFO, "Расширения", "Chromium Manifest V3") {
+                activeSheetDialog?.dismiss()
+                onExtensions()
+            }
             addMenuRow(TechIconDrawable.Kind.INFO, "О приложении", "web research") {
                 showAbout()
             }
