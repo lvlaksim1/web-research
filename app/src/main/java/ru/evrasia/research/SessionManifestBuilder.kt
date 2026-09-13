@@ -59,6 +59,11 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         val checkpointStateArtifacts = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/state.json") }
         val checkpointScreenshots = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/screenshot.jpg") }
         val checkpointEvents = sourceCounts["checkpoint"] ?: 0
+        val advancedChannels = buildAdvancedChannels(snapshot, sourceCounts)
+        val sourceMapHints = advancedChannels.getJSONObject("sourceMaps").optInt("count", 0)
+        val serviceWorkerRegistrations = advancedChannels.getJSONObject("serviceWorkers").optInt("count", 0)
+        val webSocketEvents = advancedChannels.getJSONObject("webSocket").optInt("events", 0)
+        val sseEvents = advancedChannels.getJSONObject("sse").optInt("events", 0)
 
         val fullSnapshotCaptured = snapshot.optBoolean("fullSnapshot", false)
         val pageHtmlCaptured = snapshot.optString("html", "").isNotEmpty()
@@ -105,6 +110,8 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("resourceTimingSnapshotCaptured", snapshot.has("resources"))
             .put("checkpointsCaptured", checkpointEvents > 0)
             .put("checkpointDiffsAvailable", checkpointEvents > 1)
+            .put("advancedChannelSummaryAvailable", true)
+            .put("sourceMapHintsAvailable", sourceMapHints > 0)
 
         val counters = JSONObject()
             .put("rawEvents", archive.records.length())
@@ -127,6 +134,10 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("checkpointEvents", checkpointEvents)
             .put("checkpointStateArtifacts", checkpointStateArtifacts)
             .put("checkpointScreenshots", checkpointScreenshots)
+            .put("sourceMapHints", sourceMapHints)
+            .put("serviceWorkerRegistrations", serviceWorkerRegistrations)
+            .put("webSocketEvents", webSocketEvents)
+            .put("sseEvents", sseEvents)
             .put("warnings", warnings.length())
             .put("forensicEventIds", eventIds)
             .put("forensicActionIds", actionIds)
@@ -157,6 +168,7 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("checkpointDomElements", 500)
             .put("checkpointStorageKeys", 50)
             .put("checkpointStorageValueChars", 4096)
+            .put("sourceMapHints", 200)
 
         return JSONObject()
             .put("schemaVersion", 1)
@@ -166,8 +178,96 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("counters", counters)
             .put("completeness", completeness)
             .put("forensic", forensic)
+            .put("advancedChannels", advancedChannels)
             .put("limits", limits)
             .put("warnings", warnings)
+    }
+
+    private fun buildAdvancedChannels(snapshot: JSONObject, sourceCounts: Map<String, Int>): JSONObject {
+        val serviceWorkers = try {
+            JSONArray(snapshot.optJSONArray("serviceWorkers")?.toString() ?: "[]")
+        } catch (_: Exception) {
+            JSONArray()
+        }
+        val sourceMaps = buildSourceMapHints()
+        val webSocketEvents = (sourceCounts["websocket-open"] ?: 0) +
+            (sourceCounts["websocket-state"] ?: 0) +
+            (sourceCounts["websocket-send"] ?: 0) +
+            (sourceCounts["websocket-receive"] ?: 0)
+        val sseEvents = (sourceCounts["sse-open"] ?: 0) +
+            (sourceCounts["sse-state"] ?: 0) +
+            (sourceCounts["sse-message"] ?: 0)
+        val performanceEvents = (sourceCounts["performance"] ?: 0) +
+            (sourceCounts["long-task"] ?: 0) +
+            (sourceCounts["resource-timing"] ?: 0) +
+            (sourceCounts["navigation-timing"] ?: 0)
+        val snapshotResources = snapshot.optJSONArray("resources")?.length() ?: 0
+
+        return JSONObject()
+            .put("serviceWorkers", JSONObject()
+                .put("snapshotCaptured", snapshot.has("serviceWorkers"))
+                .put("count", serviceWorkers.length())
+                .put("registrations", serviceWorkers))
+            .put("workers", JSONObject()
+                .put("dedicatedWorkerRuntimeCaptured", false)
+                .put("sharedWorkerRuntimeCaptured", false)
+                .put("reason", "Worker global execution is not instrumented because rewriting worker script URLs would change the researched page execution path."))
+            .put("webSocket", JSONObject()
+                .put("events", webSocketEvents)
+                .put("opens", sourceCounts["websocket-open"] ?: 0)
+                .put("sends", sourceCounts["websocket-send"] ?: 0)
+                .put("receives", sourceCounts["websocket-receive"] ?: 0))
+            .put("sse", JSONObject()
+                .put("events", sseEvents)
+                .put("opens", sourceCounts["sse-open"] ?: 0)
+                .put("messages", sourceCounts["sse-message"] ?: 0))
+            .put("performance", JSONObject()
+                .put("rawEvents", performanceEvents)
+                .put("snapshotResourceEntries", snapshotResources)
+                .put("navigationTimingEvents", sourceCounts["navigation-timing"] ?: 0)
+                .put("resourceTimingEvents", sourceCounts["resource-timing"] ?: 0)
+                .put("longTaskEvents", sourceCounts["long-task"] ?: 0))
+            .put("sourceMaps", sourceMaps)
+            .put("connectionDiagnostics", JSONObject()
+                .put("dns", "unavailable-via-current-webview-api")
+                .put("tlsHandshake", "unavailable-via-current-webview-api")
+                .put("certificateChain", "unavailable-via-current-webview-api")
+                .put("note", "No synthetic proxy or MITM layer is introduced solely to obtain these fields."))
+    }
+
+    private fun buildSourceMapHints(): JSONObject {
+        val hints = JSONArray()
+        var total = 0
+        archive.scripts.entries.sortedBy { it.key }.forEach { entry ->
+            val bytes = entry.value
+            if (bytes.isEmpty()) return@forEach
+            val start = maxOf(0, bytes.size - 16384)
+            val tail = bytes.copyOfRange(start, bytes.size).toString(Charsets.UTF_8)
+            val marker = "sourceMappingURL="
+            tail.lines().forEach { line ->
+                if (!line.contains(marker)) return@forEach
+                val value = line.substringAfter(marker)
+                    .substringBefore("*/")
+                    .trim()
+                    .trimEnd(';')
+                    .trim()
+                if (value.isBlank()) return@forEach
+                total++
+                if (hints.length() < 200) {
+                    hints.put(
+                        JSONObject()
+                            .put("scriptUrl", entry.key)
+                            .put("mappingUrl", value)
+                            .put("inlineData", value.startsWith("data:", true))
+                    )
+                }
+            }
+        }
+        return JSONObject()
+            .put("count", total)
+            .put("captured", hints.length())
+            .put("truncated", total > hints.length())
+            .put("hints", hints)
     }
 
     private fun addWarning(target: JSONArray, code: String, message: String, count: Int = 1) {
