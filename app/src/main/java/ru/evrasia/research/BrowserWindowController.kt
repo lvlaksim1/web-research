@@ -19,6 +19,7 @@ internal class BrowserWindowController(
     private val record: (JSONObject) -> Unit,
     private val configure: (WebView, String, String) -> Unit,
     private val onActivated: (WebView, String, String) -> Unit,
+    private val onClosed: (String, WebView) -> Unit,
     private val onCountChanged: (Int) -> Unit
 ) {
     data class Entry(
@@ -101,6 +102,7 @@ internal class BrowserWindowController(
                 .put("url", entry.web.url.orEmpty())
         )
 
+        onClosed(entry.windowId, entry.web)
         if (entry.web.parent != null) (entry.web.parent as? ViewGroup)?.removeView(entry.web)
         entry.web.stopLoading()
         entry.web.removeAllViews()
