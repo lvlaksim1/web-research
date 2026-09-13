@@ -36,11 +36,6 @@ internal class CheckpointController(
         screenshotLimitWarningSent = false
     }
 
-    fun request(reason: String) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        web.evaluateJavascript(WebResearchScripts.checkpoint(reason), null)
-    }
-
     fun captureFromBrowser(reason: String, json: String) {
         if (json.length > MAX_STATE_CHARS) {
             record(
