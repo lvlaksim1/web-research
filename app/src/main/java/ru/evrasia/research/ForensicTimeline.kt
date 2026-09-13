@@ -273,6 +273,7 @@ internal object ForensicTimelineExport {
 
     fun buildRelations(archive: ResearchArchive): JSONObject {
         val actions = linkedMapOf<String, JSONObject>()
+        val handlers = linkedMapOf<String, JSONObject>()
         val requests = linkedMapOf<String, JSONObject>()
         val mutations = JSONArray()
         val checkpoints = JSONArray()
@@ -298,6 +299,39 @@ internal object ForensicTimelineExport {
                     }
                 }
 
+                val handlerId = record.optString("handlerId", "")
+                if (handlerId.isNotBlank() && source in setOf("handler-registration", "handler-invocation")) {
+                    val handler = handlers.getOrPut(handlerId) {
+                        JSONObject()
+                            .put("handlerId", handlerId)
+                            .put("eventType", record.optString("eventType", ""))
+                            .put("handlerTarget", record.optJSONObject("handlerTarget") ?: JSONObject.NULL)
+                            .put("registrationEventId", "")
+                            .put("invocationEventIds", JSONArray())
+                            .put("causeTokens", JSONArray())
+                    }
+                    if (source == "handler-registration") {
+                        handler.put("registrationEventId", eventId)
+                        handler.put("registrationStack", record.optString("registrationStack", ""))
+                    } else {
+                        putUnique(handler.getJSONArray("invocationEventIds"), eventId)
+                        val causeToken = record.optString("causeToken", "")
+                        if (causeToken.isNotBlank()) putUnique(handler.getJSONArray("causeTokens"), causeToken)
+                        val relatedActionId = record.optString("relatedActionId", "")
+                        if (relatedActionId.isNotBlank()) {
+                            handler.put("lastRelatedActionId", relatedActionId)
+                            addLink(
+                                links,
+                                linkKeys,
+                                relatedActionId,
+                                handlerId,
+                                "action-to-handler",
+                                record.optString("actionRelation", "js-context")
+                            )
+                        }
+                    }
+                }
+
                 record.optString("requestId", "").takeIf { it.isNotBlank() }?.let { requestId ->
                     val request = requests.getOrPut(requestId) {
                         JSONObject()
@@ -313,6 +347,9 @@ internal object ForensicTimelineExport {
                     putUnique(request.getJSONArray("sources"), source)
                     request.put("lastTime", maxOf(request.optLong("lastTime", time), time))
                     if (record.has("status")) request.put("status", record.optInt("status"))
+                    if (record.optString("causeToken", "").isNotBlank()) request.put("causeToken", record.optString("causeToken", ""))
+                    if (record.optString("handlerId", "").isNotBlank()) request.put("handlerId", record.optString("handlerId", ""))
+                    if (record.optString("initiatorStack", "").isNotBlank()) request.put("initiatorStack", record.optString("initiatorStack", ""))
                     val relatedActionId = record.optString("relatedActionId", "")
                     if (relatedActionId.isNotBlank()) {
                         request.put("relatedActionId", relatedActionId)
@@ -323,6 +360,17 @@ internal object ForensicTimelineExport {
                             requestId,
                             "action-to-request",
                             record.optString("actionRelation", "temporal-nearest")
+                        )
+                    }
+                    val requestHandlerId = record.optString("handlerId", "")
+                    if (requestHandlerId.isNotBlank()) {
+                        addLink(
+                            links,
+                            linkKeys,
+                            requestHandlerId,
+                            requestId,
+                            "handler-to-request",
+                            "js-context"
                         )
                     }
                 }
@@ -379,12 +427,12 @@ internal object ForensicTimelineExport {
             .put("generatedAt", System.currentTimeMillis())
             .put(
                 "relationPolicy",
-                JSONObject().put(
-                    "temporal-nearest",
-                    "inferred proximity only; not proof of JavaScript causality"
-                )
+                JSONObject()
+                    .put("temporal-nearest", "inferred proximity only; not proof of JavaScript causality")
+                    .put("js-context", "observed browser instrumentation context propagated from a user action through a JavaScript handler or supported asynchronous callback")
             )
             .put("actions", JSONArray(actions.values.toList()))
+            .put("handlers", JSONArray(handlers.values.toList()))
             .put("requests", JSONArray(requests.values.toList()))
             .put("mutations", mutations)
             .put("checkpoints", checkpoints)
@@ -404,6 +452,10 @@ internal object ForensicTimelineExport {
         copyIfPresent(record, out, "actionId")
         copyIfPresent(record, out, "relatedActionId")
         copyIfPresent(record, out, "actionRelation")
+        copyIfPresent(record, out, "causeToken")
+        copyIfPresent(record, out, "handlerId")
+        copyIfPresent(record, out, "eventType")
+        copyIfPresent(record, out, "asyncContext")
         copyIfPresent(record, out, "requestId")
         copyIfPresent(record, out, "relatedRequestId")
         copyIfPresent(record, out, "requestRelation")
