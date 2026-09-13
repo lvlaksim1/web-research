@@ -24,6 +24,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class WebResearchV10Activity : AppCompatActivity() {
     private data class WindowRuntime(
@@ -189,7 +190,7 @@ class WebResearchV10Activity : AppCompatActivity() {
             activity = this,
             archive = archive,
             webProvider = { web },
-            captureSnapshot = { capturePageSnapshots() }
+            captureSnapshot = { onReady -> capturePageSnapshots(onReady) }
         )
         extensionManagerUi = ExtensionManagerUi(
             activity = this,
