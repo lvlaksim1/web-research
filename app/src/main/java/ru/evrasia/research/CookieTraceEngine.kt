@@ -10,9 +10,14 @@ import java.util.Locale
 import kotlin.math.abs
 
 internal class CookieTraceEngine {
+    companion object {
+        private const val MAX_TRACE_REQUEST_BODY_CHARS = 64 * 1024
+    }
     private var processedRecords = 0
     private var lastHookUrl = ""
     private var lastProgress = -1
+    private var traceArtifactDirty = true
+    private var lastTraceArtifactPage = ""
     private val snapshots = linkedMapOf<String, MutableMap<String, String>>()
     private val events = mutableListOf<JSONObject>()
     private val recentRequests = ArrayDeque<JSONObject>()
@@ -47,7 +52,7 @@ internal class CookieTraceEngine {
             val count = archive.records.length()
             if (count < processedRecords) reset()
             for (i in processedRecords until count) {
-                archive.records.optJSONObject(i)?.let { ingestNetworkRecord(JSONObject(it.toString())) }
+                archive.records.optJSONObject(i)?.let { ingestNetworkRecord(it) }
             }
             processedRecords = count
             ingestJsArtifacts(archive)
@@ -56,7 +61,11 @@ internal class CookieTraceEngine {
         if (page.startsWith("http://") || page.startsWith("https://")) {
             observeCookieSnapshot(page, CookieManager.getInstance().getCookie(page).orEmpty(), System.currentTimeMillis())
         }
-        archive.extraArtifacts["cookie-trace.json"] = exportJson(page).toString(2).toByteArray(Charsets.UTF_8)
+        if (traceArtifactDirty || page != lastTraceArtifactPage) {
+            archive.extraArtifacts["cookie-trace.json"] = exportJson(page).toString(2).toByteArray(Charsets.UTF_8)
+            traceArtifactDirty = false
+            lastTraceArtifactPage = page
+        }
     }
 
     fun eventsSnapshot(): List<JSONObject> = events.map { JSONObject(it.toString()) }
@@ -70,6 +79,8 @@ internal class CookieTraceEngine {
         fingerprints.clear()
         lastHookUrl = ""
         lastProgress = -1
+        traceArtifactDirty = true
+        lastTraceArtifactPage = ""
     }
 
     fun scopeHost(page: String, explicitDomain: String = ""): String {
@@ -159,10 +170,10 @@ internal class CookieTraceEngine {
                 .put("url", url)
                 .put("status", record.optInt("status", 0))
                 .put("source", source)
-                .put("requestBody", record.optString("requestBody", ""))
+                .put("requestBody", boundedTraceBody(record.optString("requestBody", ""), req))
                 .put("requestMimeType", record.optString("requestMimeType", ""))
             val headers = record.optJSONObject("requestHeaders") ?: record.optJSONObject("headers")
-            if (headers != null) req.put("requestHeaders", JSONObject(headers.toString()))
+            if (headers != null) req.put("requestHeaders", copyJsonObject(headers))
             if (record.has("_storeId")) req.put("_storeId", record.optLong("_storeId"))
             recentRequests.addLast(req)
             trimRequests(System.currentTimeMillis())
@@ -200,10 +211,10 @@ internal class CookieTraceEngine {
                 .put("status", record.optInt("status", 0))
                 .put("url", url)
                 .put("raw", raw)
-                .put("requestBody", record.optString("requestBody", ""))
+                .put("requestBody", boundedTraceBody(record.optString("requestBody", ""), trace))
                 .put("requestMimeType", record.optString("requestMimeType", ""))
             val headers = record.optJSONObject("requestHeaders") ?: record.optJSONObject("headers")
-            if (headers != null) trace.put("requestHeaders", JSONObject(headers.toString()))
+            if (headers != null) trace.put("requestHeaders", copyJsonObject(headers))
             if (record.has("_storeId")) trace.put("_storeId", record.optLong("_storeId"))
             addTrace(trace)
             lastExact[cookieKey(host, parsed.name)] = endTime
@@ -296,9 +307,9 @@ internal class CookieTraceEngine {
             .put("status", from.optInt("status", 0))
             .put("url", from.optString("url", ""))
             .put("requestSource", from.optString("source", ""))
-            .put("requestBody", from.optString("requestBody", ""))
+            .put("requestBody", boundedTraceBody(from.optString("requestBody", ""), to))
             .put("requestMimeType", from.optString("requestMimeType", ""))
-        from.optJSONObject("requestHeaders")?.let { to.put("requestHeaders", JSONObject(it.toString())) }
+        from.optJSONObject("requestHeaders")?.let { to.put("requestHeaders", copyJsonObject(it)) }
         if (from.has("_storeId")) to.put("_storeId", from.optLong("_storeId"))
         if (delta != null) to.put("deltaMs", delta)
     }
@@ -340,15 +351,33 @@ internal class CookieTraceEngine {
         }
         if (!fingerprints.add(fingerprint)) return
         events.add(event)
+        traceArtifactDirty = true
         if (events.size > 2000) events.removeAt(0)
         if (fingerprints.size > 5000) fingerprints.clear()
+    }
+
+    private fun boundedTraceBody(value: String, target: JSONObject): String {
+        if (value.length <= MAX_TRACE_REQUEST_BODY_CHARS) return value
+        target.put("requestBodyTruncated", true)
+        target.put("requestBodyOriginalChars", value.length)
+        return value.substring(0, MAX_TRACE_REQUEST_BODY_CHARS)
+    }
+
+    private fun copyJsonObject(source: JSONObject): JSONObject {
+        val copy = JSONObject()
+        val keys = source.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            copy.put(key, source.opt(key))
+        }
+        return copy
     }
 
     private fun cookieKey(host: String, name: String) = "${host.lowercase(Locale.US)}|$name"
 
     private fun exportJson(page: String): JSONObject {
         val arr = JSONArray()
-        events.forEach { arr.put(JSONObject(it.toString())) }
+        events.forEach { arr.put(it) }
         return JSONObject()
             .put("format", "evrasia-cookie-trace-v2")
             .put("generatedAt", System.currentTimeMillis())
