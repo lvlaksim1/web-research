@@ -24,6 +24,7 @@ internal class WebResearchWebViewController(
     private val address: EditText,
     private val captureController: WebCaptureController,
     private val navigationController: WebNavigationController,
+    private val extensionManager: ExtensionManager,
     private val handler: Handler,
     private val record: (JSONObject) -> Unit,
     private val onLoadingChanged: (Boolean) -> Unit,
@@ -35,7 +36,6 @@ internal class WebResearchWebViewController(
     private var desktopMode = false
     private val extensionRuntime = ExtensionRuntime(activity, web)
     private val extensionScripts = ExtensionContentScriptController(web)
-    private val extensionManager = ExtensionManager(activity)
 
     fun install() {
         initializeBrowserMode()
@@ -92,6 +92,11 @@ internal class WebResearchWebViewController(
                 return super.shouldInterceptRequest(view, request)
             }
         }
+    }
+
+    fun reloadExtensions(reloadPage: Boolean = false) {
+        extensionScripts.replaceInstalled(extensionManager.installed())
+        if (reloadPage && !web.url.isNullOrBlank()) web.reload()
     }
 
     fun isDesktopMode(): Boolean = desktopMode
