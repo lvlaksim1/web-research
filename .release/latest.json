@@ -1,28 +1,34 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 41,
-  "tag": "v41",
-  "versionCode": 41,
-  "versionName": "v41",
+  "releaseNumber": 42,
+  "tag": "v42",
+  "versionCode": 42,
+  "versionName": "v42",
   "packageId": "web.research",
-  "commit": "88ac47b60743e06c9e691c41198be447ee933225",
-  "artifact": "web-research-v41.apk",
-  "sha256": "82d6e6d6a0cb964fa55a986508bf80cb4b83362d77e36337da63c3f31596d863",
-  "publishedAt": "2026-09-13T19:03:52Z",
-  "previousRelease": "v40",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v41",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v41/web-research-v41.apk",
+  "commit": "cea84ae4a1963f41127b97cc9eaaed530b19412d",
+  "artifact": "web-research-v42.apk",
+  "sha256": "c0344f6a0be1da8396d8f7b26f97e7f5d3e29da4f50fcfaf7e1db1807075ea02",
+  "publishedAt": "2026-09-13T19:15:05Z",
+  "previousRelease": "v41",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v42",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v42/web-research-v42.apk",
   "commits": [
-    "Stage 1: add forensic timeline and event relations",
-    "release: web research v41 [release]"
+    "Stage 2: add forensic checkpoints and diffs",
+    "release: web research v42 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v41.md",
+    ".release/requests/v42.md",
     "CAPTURE_MATRIX.md",
+    "app/src/main/java/ru/evrasia/research/CheckpointController.kt",
+    "app/src/main/java/ru/evrasia/research/CheckpointExport.kt",
     "app/src/main/java/ru/evrasia/research/ForensicTimeline.kt",
     "app/src/main/java/ru/evrasia/research/ResearchArchive.kt",
     "app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt",
     "app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt",
+    "app/src/main/java/ru/evrasia/research/WebCaptureController.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchScripts.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchWebViewController.kt",
     "app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt"
   ]
 }

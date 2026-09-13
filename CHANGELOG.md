@@ -3,6 +3,35 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v42-START -->
+## v42 — 2026-09-13T19:15:05Z
+
+- Release commit: `cea84ae4a1963f41127b97cc9eaaed530b19412d`
+- Artifact: `web-research-v42.apk`
+- SHA-256: `c0344f6a0be1da8396d8f7b26f97e7f5d3e29da4f50fcfaf7e1db1807075ea02`
+- Previous release: **v41**
+
+### Changes
+
+- Stage 2: add forensic checkpoints and diffs
+- release: web research v42 [release]
+
+### Changed files
+
+- `.release/requests/v42.md`
+- `CAPTURE_MATRIX.md`
+- `app/src/main/java/ru/evrasia/research/CheckpointController.kt`
+- `app/src/main/java/ru/evrasia/research/CheckpointExport.kt`
+- `app/src/main/java/ru/evrasia/research/ForensicTimeline.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchive.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt`
+- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/main/java/ru/evrasia/research/WebCaptureController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchScripts.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchWebViewController.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v42-END -->
 <!-- AUTO-CHANGELOG-v41-START -->
 ## v41 — 2026-09-13T19:03:52Z
 
