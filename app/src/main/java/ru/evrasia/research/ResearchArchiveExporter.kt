@@ -214,7 +214,9 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
                     .put("_evrasiaSource", r.optString("source", "unknown"))
                     .put("_eventId", r.optString("eventId", ""))
                     .put("_requestId", r.optString("requestId", ""))
-                    .put("_relatedActionId", r.optString("relatedActionId", "")))
+                    .put("_relatedActionId", r.optString("relatedActionId", ""))
+                    .put("_windowId", r.optString("windowId", ""))
+                    .put("_frameId", r.optString("frameId", "")))
             }
         }
         return JSONObject().put("log", JSONObject()
