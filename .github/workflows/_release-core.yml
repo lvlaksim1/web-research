@@ -62,11 +62,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          RELEASE_TAGS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
-          LAST=$(printf '%s\n' "$RELEASE_TAGS" | sed -nE 's/^v([0-9]+)$/\1/p' | sort -n | tail -1)
+          TAG_REFS=$(gh api --paginate "/repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" --jq '.[] | .ref')
+          CANDIDATES=$(printf '%s\n' "$TAG_REFS" | sed -nE 's#^refs/tags/v([0-9]+)$#\1#p' | sort -nr)
 
-          if [ -z "$LAST" ]; then
-            LAST=0
+          LAST=0
+          for NUMBER in $CANDIDATES; do
+            RELEASE_JSON=$(gh api "/repos/$GITHUB_REPOSITORY/releases/tags/v$NUMBER" 2>/dev/null || true)
+            if [ -z "$RELEASE_JSON" ]; then
+              continue
+            fi
+            IS_DRAFT=$(printf '%s' "$RELEASE_JSON" | jq -r '.draft')
+            IS_PRERELEASE=$(printf '%s' "$RELEASE_JSON" | jq -r '.prerelease')
+            if [ "$IS_DRAFT" = "false" ] && [ "$IS_PRERELEASE" = "false" ]; then
+              LAST="$NUMBER"
+              break
+            fi
+          done
+
+          if [ "$LAST" -eq 0 ]; then
             echo "No published stable numeric releases found; next release will be v1"
           else
             echo "Latest published stable numeric release: v$LAST"
