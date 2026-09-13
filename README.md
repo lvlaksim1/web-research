@@ -50,9 +50,12 @@ Android WebView-инструмент для максимально полног�
 - `checkpoints/index.json` — последовательность автоматических before/after checkpoints;
 - `checkpoint-diffs.json` — изменения cookies, storage и DOM между соседними checkpoints;
 - `checkpoints/<id>/state.json` и ограниченные viewport screenshots;
+- checkpoint/screenshot лимиты начинаются заново при каждом старте ZIP-записи, поэтому действия до записи не расходуют её forensic budget;
+- внешние JavaScript-файлы и ресурсы, уже захваченные в текущей browser session до начала записи, включаются как supporting evidence;
+- `browser/cookie-trace.json` экспортируется с событиями, отфильтрованными по recording window;
 - `raw-events.json` — исходный журнал событий с forensic ID и capture ordering;
-- `network.har`;
-- `api-summary.json`;
+- `network.har` — только HTTP evidence, без checkpoints/performance/errors;
+- `api-summary.json` — только application/realtime API sources, без служебных событий;
 - `actions.json`;
 - `dom-mutations.json`;
 - `realtime.json`;
