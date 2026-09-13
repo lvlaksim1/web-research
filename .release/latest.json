@@ -1,27 +1,31 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 36,
-  "tag": "v36",
-  "versionCode": 36,
-  "versionName": "v36",
+  "releaseNumber": 37,
+  "tag": "v37",
+  "versionCode": 37,
+  "versionName": "v37",
   "packageId": "web.research",
-  "commit": "817b2e34c58d38a8ebc3ef7a0464031ae985688d",
-  "artifact": "web-research-v36.apk",
-  "sha256": "7634de83975349c8bdcf3be3030170d29afee8b9fbe13482162b83a06c712c8d",
-  "publishedAt": "2026-09-13T17:01:05Z",
-  "previousRelease": "v35",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v36",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v36/web-research-v36.apk",
+  "commit": "74d985715d2ff9c276daee196c6cf48f30557cac",
+  "artifact": "web-research-v37.apk",
+  "sha256": "2121f3f6aeb014028a0de1dc5ac93b839b5cc5eb67f5ac66e8f784aeb576af46",
+  "publishedAt": "2026-09-13T17:30:29Z",
+  "previousRelease": "v36",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v37",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v37/web-research-v37.apk",
   "commits": [
-    "chore: remove v35 release request",
-    "Fix Chromium extension match patterns",
-    "release: web research v36 [release]"
+    "chore: remove v36 release request",
+    "Prevent OOM on large captured responses",
+    "release: web research v37 [release]",
+    "Fix release version detection",
+    "release: web research v37 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v35.md",
+    ".github/workflows/_release-core.yml",
+    ".github/workflows/validate-work-branches.yml",
     ".release/requests/v36.md",
-    "app/src/main/java/ru/evrasia/research/ExtensionContentScriptController.kt",
-    "app/src/main/java/ru/evrasia/research/ExtensionMatchPattern.kt",
-    "app/src/test/java/ru/evrasia/research/ExtensionMatchPatternTest.kt"
+    ".release/requests/v37.md",
+    "app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt",
+    "app/src/main/java/ru/evrasia/research/NetworkRecordPipeline.kt",
+    "app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt"
   ]
 }

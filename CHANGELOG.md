@@ -3,6 +3,32 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v37-START -->
+## v37 — 2026-09-13T17:30:29Z
+
+- Release commit: `74d985715d2ff9c276daee196c6cf48f30557cac`
+- Artifact: `web-research-v37.apk`
+- SHA-256: `2121f3f6aeb014028a0de1dc5ac93b839b5cc5eb67f5ac66e8f784aeb576af46`
+- Previous release: **v36**
+
+### Changes
+
+- chore: remove v36 release request
+- Prevent OOM on large captured responses
+- release: web research v37 [release]
+- Fix release version detection
+- release: web research v37 [release]
+
+### Changed files
+
+- `.github/workflows/_release-core.yml`
+- `.github/workflows/validate-work-branches.yml`
+- `.release/requests/v36.md`
+- `.release/requests/v37.md`
+- `app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkRecordPipeline.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v37-END -->
 <!-- AUTO-CHANGELOG-v36-START -->
 ## v36 — 2026-09-13T17:01:05Z
 

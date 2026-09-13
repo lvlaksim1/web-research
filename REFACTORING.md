@@ -3,23 +3,27 @@
 <!-- AUTO-RELEASE-START -->
 ## Контрольная точка рефакторинга
 
-- Актуально для релиза: **v36**
-- Релизный commit: `817b2e34c58d38a8ebc3ef7a0464031ae985688d`
-- Опубликован: `2026-09-13T17:01:05Z`
+- Актуально для релиза: **v37**
+- Релизный commit: `74d985715d2ff9c276daee196c6cf48f30557cac`
+- Опубликован: `2026-09-13T17:30:29Z`
 
 ### Изменения между релизами
 
-- chore: remove v35 release request
-- Fix Chromium extension match patterns
-- release: web research v36 [release]
+- chore: remove v36 release request
+- Prevent OOM on large captured responses
+- release: web research v37 [release]
+- Fix release version detection
+- release: web research v37 [release]
 
 ### Изменённые файлы
 
-- `.release/requests/v35.md`
+- `.github/workflows/_release-core.yml`
+- `.github/workflows/validate-work-branches.yml`
 - `.release/requests/v36.md`
-- `app/src/main/java/ru/evrasia/research/ExtensionContentScriptController.kt`
-- `app/src/main/java/ru/evrasia/research/ExtensionMatchPattern.kt`
-- `app/src/test/java/ru/evrasia/research/ExtensionMatchPatternTest.kt`
+- `.release/requests/v37.md`
+- `app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt`
+- `app/src/main/java/ru/evrasia/research/NetworkRecordPipeline.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
 <!-- AUTO-RELEASE-END -->
 
 Автоматическая контрольная точка текущего состояния рефакторинга. Детальные архитектурные инварианты описаны в `ARCHITECTURE.md`.
