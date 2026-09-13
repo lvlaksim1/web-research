@@ -264,7 +264,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
                 })
                 .put("modernWindows", modernFrameWindows.size)
                 .put("legacyWindows", legacyFrameWindows.size)
-                .put("feature", "JS_INJECTION_IN_FRAME_AND_WORLD"))
+                .put("feature", "JS_INJECTION_IN_FRAME_AND_WORLD")
+                .put("frameIdentityMethod", "sourceOrigin+url+performance.timeOrigin+window.name+topFlag")
+                .put("parentFrameRelation", "unavailable-via-current-webview-api"))
             .put("limits", limits)
             .put("warnings", warnings)
     }
