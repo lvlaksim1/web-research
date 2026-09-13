@@ -29,7 +29,7 @@ internal object WebResearchScripts {
             const cpDocState=(d,w,depth=0)=>{let all=[],domLimit=depth?150:500;try{all=Array.from(d.querySelectorAll('a,button,input,select,textarea,option,form,[role],[onclick]'))}catch(e){};let captured=all.slice(0,domLimit).map((e,i)=>cpElement(e,i,d)),frames=[],frameTotal=0,frameSnapshots=0;try{let frameList=Array.from(d.querySelectorAll('iframe,frame'));frameTotal=frameList.length;for(const [i,f] of frameList.slice(0,50).entries()){let item={key:cpKey(f,i),id:f.id||'',name:f.name||'',src:f.src||f.getAttribute?.('src')||'',sandbox:f.getAttribute?.('sandbox')||'',allow:f.getAttribute?.('allow')||'',loading:f.getAttribute?.('loading')||'',rect:cpRect(f),sameOrigin:false};try{let fd=f.contentDocument,fw=f.contentWindow;if(fd&&fw){let frameUrl=String(fw.location.href||'');item.sameOrigin=true;item.url=frameUrl;item.title=fd.title||'';if(depth<1&&frameSnapshots<10){item.snapshot=cpDocState(fd,fw,depth+1);frameSnapshots++}else if(depth<1)item.snapshotOmitted='same-origin-frame-snapshot-limit'}}catch(e){item.accessError=String(e)}frames.push(item)}}catch(e){frames=[{error:String(e)}]}return{viewport:cpViewport(w),focus:cpFocus(d),selection:cpSelection(d,w),dom:{total:all.length,captured:captured.length,truncated:all.length>captured.length,elements:captured},frames:{total:frameTotal,captured:frames.length,snapshots:frameSnapshots,truncated:frameTotal>frames.length,items:frames},shadowDom:cpShadow(d,depth)}};
             window.__WR_RUNTIME_UI_STATE=()=>cpDocState(document,window,0);
             const cpState=(reason,extra)=>{let ui=window.__WR_RUNTIME_UI_STATE();return{time:Date.now(),reason:String(reason||''),url:location.href,title:document.title,cookie:document.cookie,localStorage:cpStore(localStorage),sessionStorage:cpStore(sessionStorage),viewport:ui.viewport,focus:ui.focus,selection:ui.selection,dom:ui.dom,frames:ui.frames,shadowDom:ui.shadowDom,trigger:extra||{}}};
-            window.__WR_CAPTURE_CHECKPOINT=(reason,extra)=>{try{EvrasiaResearch.checkpoint(String(reason||'manual').slice(0,80),JSON.stringify(cpState(reason,extra)))}catch(e){warn('checkpoint_bridge_failed','A browser checkpoint could not be delivered to the native recorder.','checkpoint',{error:String(e)})}};
+            window.__WR_CAPTURE_CHECKPOINT=(reason,extra)=>{try{EvrasiaResearch.checkpoint(String(reason||'manual').slice(0,80),JSON.stringify(cpState(reason,extra)));return true}catch(e){warn('checkpoint_bridge_failed','A browser checkpoint could not be delivered to the native recorder.','checkpoint',{error:String(e)});return false}};
             let wrActionSeq=0;
             ['click','change','submit'].forEach(type=>window.addEventListener(type,e=>{let info=target(e.target),token='actionctx-'+wrPageId+'-'+String(++wrActionSeq).padStart(8,'0'),ctx={token:token,action:type,target:info,time:Date.now()};window.__WR_ACTIVE_ACTION_CONTEXT=ctx;send({source:'user-action',time:ctx.time,action:type,page:location.href,target:info,browserActionToken:token,eventPhase:e.eventPhase||0});window.__WR_CAPTURE_CHECKPOINT('before-action',{action:type,target:info});setTimeout(()=>{if(window.__WR_ACTIVE_ACTION_CONTEXT===ctx)window.__WR_ACTIVE_ACTION_CONTEXT=null},0);setTimeout(()=>window.__WR_CAPTURE_CHECKPOINT('after-action',{action:type,target:info}),350)},true));
             const HP=history.pushState.bind(history),HR=history.replaceState.bind(history);
@@ -96,11 +96,15 @@ internal object WebResearchScripts {
           (function(){
             try{
               if(window.__WR_CAPTURE_CHECKPOINT){
-                window.__WR_CAPTURE_CHECKPOINT(${JSONObject.quote(reason)},{source:'native-request'});
+                return window.__WR_CAPTURE_CHECKPOINT(${JSONObject.quote(reason)},{source:'native-request'})===true;
               }
             }catch(e){}
+            return false;
           })();
         """.trimIndent()
+
+    fun instrumentedCheckpoint(reason: String): String =
+        instrumentation() + "\n" + checkpoint(reason)
 
     fun lightSnapshot(nativeCookies: String): String = """
           (function(){
