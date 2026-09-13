@@ -126,7 +126,8 @@ internal class ForensicTimeline(
                 }
             }
 
-            "navigation", "history", "websocket-open", "websocket-send", "sse-open" -> {
+            "navigation", "history", "websocket-open", "websocket-send", "sse-open",
+            "window-created", "window-activated", "window-closed", "frame-lifecycle" -> {
                 linkNearestAction(record, eventTime)
             }
         }
@@ -274,6 +275,8 @@ internal object ForensicTimelineExport {
         val mutationsByRequest = linkedMapOf<String, MutableList<String>>()
         val links = JSONArray()
         val linkKeys = linkedSetOf<String>()
+        val windows = linkedMapOf<String, JSONObject>()
+        val frames = linkedMapOf<String, JSONObject>()
 
         synchronized(archive) {
             for (index in 0 until archive.records.length()) {
@@ -281,6 +284,37 @@ internal object ForensicTimelineExport {
                 val eventId = eventId(record, index)
                 val source = record.optString("source", "unknown")
                 val time = record.optLong("time", record.optLong("capturedAt", 0L))
+
+                val windowId = record.optString("windowId", "")
+                val frameId = record.optString("frameId", "")
+                if (windowId.isNotBlank()) {
+                    val window = windows.getOrPut(windowId) {
+                        JSONObject()
+                            .put("windowId", windowId)
+                            .put("firstEventId", eventId)
+                            .put("firstTime", time)
+                            .put("openerWindowId", record.optString("openerWindowId", ""))
+                            .put("creationReason", record.optString("creationReason", ""))
+                    }
+                    window.put("lastEventId", eventId)
+                    window.put("lastTime", time)
+                    if (record.has("url")) window.put("lastUrl", record.optString("url", ""))
+                    if (source == "window-closed") window.put("closed", true)
+                }
+                if (frameId.isNotBlank()) {
+                    val frame = frames.getOrPut(frameId) {
+                        JSONObject()
+                            .put("frameId", frameId)
+                            .put("windowId", windowId)
+                            .put("firstEventId", eventId)
+                            .put("firstTime", time)
+                            .put("sourceOrigin", record.optString("sourceOrigin", ""))
+                            .put("isMainFrame", record.optBoolean("isMainFrame", frameId.endsWith("-main")))
+                    }
+                    frame.put("lastEventId", eventId)
+                    frame.put("lastTime", time)
+                    if (record.has("url")) frame.put("lastUrl", record.optString("url", ""))
+                }
 
                 record.optString("actionId", "").takeIf { it.isNotBlank() }?.let { actionId ->
                     actions.getOrPut(actionId) {
@@ -291,6 +325,8 @@ internal object ForensicTimelineExport {
                             .put("action", record.optString("action", ""))
                             .put("page", record.optString("page", record.optString("url", "")))
                             .put("target", record.optJSONObject("target") ?: JSONObject.NULL)
+                            .put("windowId", windowId)
+                            .put("frameId", frameId)
                     }
                 }
 
@@ -304,6 +340,8 @@ internal object ForensicTimelineExport {
                             .put("sources", JSONArray())
                             .put("firstTime", time)
                             .put("lastTime", time)
+                            .put("windowId", windowId)
+                            .put("frameId", frameId)
                     }
                     putUnique(request.getJSONArray("eventIds"), eventId)
                     putUnique(request.getJSONArray("sources"), source)
@@ -363,6 +401,8 @@ internal object ForensicTimelineExport {
                         .put("eventId", eventId)
                         .put("time", time)
                         .put("page", record.optString("page", record.optString("url", "")))
+                        .put("windowId", windowId)
+                        .put("frameId", frameId)
                     val relatedActionId = record.optString("relatedActionId", "")
                     val relatedRequestId = record.optString("relatedRequestId", "")
                     if (relatedActionId.isNotBlank()) {
@@ -398,6 +438,8 @@ internal object ForensicTimelineExport {
                             .put("eventId", eventId)
                             .put("time", time)
                             .put("page", record.optString("page", record.optString("url", "")))
+                            .put("windowId", windowId)
+                            .put("frameId", frameId)
                     )
                 }
             }
@@ -439,6 +481,8 @@ internal object ForensicTimelineExport {
                         "same browser action context token was observed by both events"
                     )
             )
+            .put("windows", JSONArray(windows.values.toList()))
+            .put("frames", JSONArray(frames.values.toList()))
             .put("actions", JSONArray(actions.values.toList()))
             .put("requests", JSONArray(requests.values.toList()))
             .put("initiators", JSONArray(initiators.values.toList()))
@@ -474,6 +518,15 @@ internal object ForensicTimelineExport {
         copyIfPresent(record, out, "duration")
         copyIfPresent(record, out, "evidenceType")
         copyIfPresent(record, out, "code")
+        copyIfPresent(record, out, "windowId")
+        copyIfPresent(record, out, "frameId")
+        copyIfPresent(record, out, "openerWindowId")
+        copyIfPresent(record, out, "creationReason")
+        copyIfPresent(record, out, "sourceOrigin")
+        copyIfPresent(record, out, "isMainFrame")
+        copyIfPresent(record, out, "executionWorld")
+        copyIfPresent(record, out, "frameCaptureMode")
+        copyIfPresent(record, out, "stateArtifact")
         record.optJSONObject("target")?.let { out.put("target", JSONObject(it.toString())) }
         return out
     }
