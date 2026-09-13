@@ -21,20 +21,17 @@ internal class CheckpointController(
         private const val MAX_CHECKPOINTS = 80
         private const val MAX_SCREENSHOTS = 80
         private const val MAX_STATE_CHARS = 1_500_000
-        private const val MIN_INTERVAL_MS = 120L
         private const val MAX_SCREENSHOT_PIXELS = 1_800_000.0
     }
 
     private var checkpointCount = 0
     private var screenshotCount = 0
-    private var lastCheckpointAt = 0L
     private var checkpointLimitWarningSent = false
     private var screenshotLimitWarningSent = false
 
     fun reset() {
         checkpointCount = 0
         screenshotCount = 0
-        lastCheckpointAt = 0L
         checkpointLimitWarningSent = false
         screenshotLimitWarningSent = false
     }
@@ -102,7 +99,6 @@ internal class CheckpointController(
             return
         }
 
-        if (now - lastCheckpointAt < MIN_INTERVAL_MS) return
 
         val page = state.optString("url", web.url ?: "")
         state.put("nativeCookie", CookieManager.getInstance().getCookie(page).orEmpty())
@@ -127,7 +123,6 @@ internal class CheckpointController(
 
         archive.addCheckpoint(reason.take(80), state, screenshot)
         checkpointCount++
-        lastCheckpointAt = now
         onChanged()
     }
 
