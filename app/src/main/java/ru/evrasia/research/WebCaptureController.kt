@@ -82,8 +82,11 @@ internal class WebCaptureController(
         fun attempt(remaining: Int) {
             if (activity.isFinishing || activity.isDestroyed) return
             web.evaluateJavascript(script) { result ->
-                if (result != "true" && remaining > 0) {
+                if (result == "true") return@evaluateJavascript
+                if (remaining > 0) {
                     web.postDelayed({ attempt(remaining - 1) }, 120L)
+                } else {
+                    checkpointController.captureNativeFallback(reason)
                 }
             }
         }
