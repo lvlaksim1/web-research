@@ -3,6 +3,42 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v48-START -->
+## v48 — 2026-09-13T23:06:47Z
+
+- Release commit: `9f1ee29c2921255cca4d9e74e0c4b2eadbe1a4d3`
+- Artifact: `web-research-v48.apk`
+- SHA-256: `00246be0fafc7c20c0144a4cc131818ebddb62c231f49d919aaf8c7ec95a086f`
+- Previous release: **v47**
+
+### Changes
+
+- chore: remove v47 release request
+- v48: add multi-context forensic capture (#15)
+- release: web research v48 [release]
+
+### Changed files
+
+- `.release/requests/v47.md`
+- `.release/requests/v48.md`
+- `CAPTURE_MATRIX.md`
+- `app/build.gradle.kts`
+- `app/src/main/java/ru/evrasia/research/BrowserWindowController.kt`
+- `app/src/main/java/ru/evrasia/research/CheckpointController.kt`
+- `app/src/main/java/ru/evrasia/research/ForensicTimeline.kt`
+- `app/src/main/java/ru/evrasia/research/FrameCaptureController.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchive.kt`
+- `app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt`
+- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/main/java/ru/evrasia/research/WebCaptureController.kt`
+- `app/src/main/java/ru/evrasia/research/WebNavigationController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchBrowserLayout.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchExportController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchScripts.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchWebViewController.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v48-END -->
 <!-- AUTO-CHANGELOG-v47-START -->
 ## v47 — 2026-09-13T22:32:02Z
 
