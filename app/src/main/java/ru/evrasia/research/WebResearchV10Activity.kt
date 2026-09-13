@@ -51,6 +51,8 @@ class WebResearchV10Activity : AppCompatActivity() {
     private lateinit var exportController: WebResearchExportController
     private lateinit var captureController: WebCaptureController
     private lateinit var menuController: WebResearchMenuController
+    private lateinit var extensionManager: ExtensionManager
+    private lateinit var extensionManagerUi: ExtensionManagerUi
     private val archive = ResearchArchive()
     private lateinit var userAgent: String
     private val badgeUpdatePending = AtomicBoolean(false)
@@ -160,6 +162,7 @@ class WebResearchV10Activity : AppCompatActivity() {
             web = web,
             captureSnapshot = { capturePageSnapshot() }
         )
+        extensionManager = ExtensionManager(this)
 
         webViewController = WebResearchWebViewController(
             activity = this,
@@ -168,6 +171,7 @@ class WebResearchV10Activity : AppCompatActivity() {
             address = address,
             captureController = captureController,
             navigationController = navigationController,
+            extensionManager = extensionManager,
             handler = uiHandler,
             record = { addRecord(it) },
             onLoadingChanged = { isLoading ->
@@ -186,10 +190,16 @@ class WebResearchV10Activity : AppCompatActivity() {
             }
         )
         webViewController.install()
+        extensionManagerUi = ExtensionManagerUi(
+            activity = this,
+            manager = extensionManager,
+            onChanged = { webViewController.reloadExtensions(reloadPage = true) }
+        )
         menuController = WebResearchMenuController(
             activity = this,
             bookmarkController = bookmarkController,
             webViewController = webViewController,
+            onExtensions = { extensionManagerUi.show() },
             paletteProvider = { palette },
             currentPageProvider = { currentPage() },
             onAccentColor = { color, persist -> applyAccentColor(color, persist) }
