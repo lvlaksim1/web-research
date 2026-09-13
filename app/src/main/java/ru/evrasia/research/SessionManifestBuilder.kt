@@ -65,6 +65,17 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         val webSocketEvents = advancedChannels.getJSONObject("webSocket").optInt("events", 0)
         val sseEvents = advancedChannels.getJSONObject("sse").optInt("events", 0)
 
+        val runtimeUi = snapshot.optJSONObject("runtimeUi") ?: JSONObject()
+        val runtimeFrames = runtimeUi.optJSONObject("frames")?.optJSONArray("items") ?: JSONArray()
+        var sameOriginFrameSnapshots = 0
+        for (index in 0 until runtimeFrames.length()) {
+            val frame = runtimeFrames.optJSONObject(index) ?: continue
+            if (frame.optBoolean("sameOrigin", false) && frame.has("snapshot")) sameOriginFrameSnapshots++
+        }
+        val shadowRootCount = runtimeUi.optJSONObject("shadowDom")?.optInt("captured", 0) ?: 0
+        val runtimeDomElements = runtimeUi.optJSONObject("dom")?.optInt("captured", 0) ?: 0
+        val runtimeUiCaptured = runtimeUi.length() > 0 && !runtimeUi.has("error")
+
         val fullSnapshotCaptured = snapshot.optBoolean("fullSnapshot", false)
         val pageHtmlCaptured = snapshot.optString("html", "").isNotEmpty()
         val cacheSnapshotHasError = cacheSnapshotHasError(snapshot)
@@ -73,6 +84,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         val warnings = JSONArray()
         if (!fullSnapshotCaptured) {
             addWarning(warnings, "full_snapshot_missing", "Full page snapshot was not present when the ZIP was created.")
+        }
+        if (!runtimeUiCaptured) {
+            addWarning(warnings, "runtime_ui_snapshot_missing", "Runtime UI state was not present in the final page snapshot.")
         }
         if (archive.scriptErrors.isNotEmpty()) {
             addWarning(warnings, "script_archive_errors", "One or more JavaScript files could not be archived.", archive.scriptErrors.size)
@@ -108,6 +122,12 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("cacheStorageSnapshotCaptured", snapshot.has("cacheStorage"))
             .put("indexedDbSnapshotCaptured", snapshot.has("indexedDB"))
             .put("resourceTimingSnapshotCaptured", snapshot.has("resources"))
+            .put("runtimeUiSnapshotCaptured", runtimeUiCaptured)
+            .put("viewportStateCaptured", runtimeUi.has("viewport"))
+            .put("focusStateCaptured", runtimeUi.has("focus"))
+            .put("selectionStateCaptured", runtimeUi.has("selection"))
+            .put("iframeInventoryCaptured", runtimeUi.has("frames"))
+            .put("openShadowDomCaptured", runtimeUi.has("shadowDom"))
             .put("checkpointsCaptured", checkpointEvents > 0)
             .put("checkpointDiffsAvailable", checkpointEvents > 1)
             .put("advancedChannelSummaryAvailable", true)
@@ -134,6 +154,10 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("checkpointEvents", checkpointEvents)
             .put("checkpointStateArtifacts", checkpointStateArtifacts)
             .put("checkpointScreenshots", checkpointScreenshots)
+            .put("runtimeDomElements", runtimeDomElements)
+            .put("iframeCount", runtimeFrames.length())
+            .put("sameOriginFrameSnapshots", sameOriginFrameSnapshots)
+            .put("openShadowRoots", shadowRootCount)
             .put("sourceMapHints", sourceMapHints)
             .put("serviceWorkerRegistrations", serviceWorkerRegistrations)
             .put("webSocketEvents", webSocketEvents)
@@ -163,11 +187,19 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("bridgeChunkChars", 100000)
             .put("derivativeRedirectHops", 10)
             .put("checkpointsPerRecordingWindow", 80)
-            .put("checkpointScreenshotsPerRecordingWindow", 40)
+            .put("checkpointScreenshotsPerRecordingWindow", 80)
             .put("checkpointStateChars", 1500000)
             .put("checkpointDomElements", 500)
             .put("checkpointStorageKeys", 50)
             .put("checkpointStorageValueChars", 4096)
+            .put("runtimeFormValueChars", 4096)
+            .put("runtimeSelectedValues", 100)
+            .put("iframeInventoryPerDocument", 50)
+            .put("sameOriginFrameSnapshotDepth", 1)
+            .put("openShadowRoots", 40)
+            .put("shadowScanElements", 5000)
+            .put("shadowElementsPerRoot", 120)
+            .put("shadowHtmlCharsPerRoot", 30000)
             .put("sourceMapHints", 200)
 
         return JSONObject()
@@ -178,6 +210,13 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("counters", counters)
             .put("completeness", completeness)
             .put("forensic", forensic)
+            .put("runtimeUi", JSONObject()
+                .put("captured", runtimeUiCaptured)
+                .put("viewport", runtimeUi.optJSONObject("viewport") ?: JSONObject.NULL)
+                .put("frameCount", runtimeFrames.length())
+                .put("sameOriginFrameSnapshots", sameOriginFrameSnapshots)
+                .put("openShadowRoots", shadowRootCount)
+                .put("closedShadowRoots", "unavailable-without-invasive-attachShadow-interception"))
             .put("advancedChannels", advancedChannels)
             .put("limits", limits)
             .put("warnings", warnings)
