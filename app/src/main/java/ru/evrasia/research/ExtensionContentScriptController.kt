@@ -2,7 +2,6 @@ package ru.evrasia.research
 
 import android.webkit.WebView
 import java.io.File
-import java.util.regex.Pattern
 
 internal class ExtensionContentScriptController(private val web: WebView) {
     data class InstalledExtension(val root: File, val manifest: ExtensionManifest)
@@ -35,14 +34,8 @@ internal class ExtensionContentScriptController(private val web: WebView) {
     }
 
     private fun matches(script: ExtensionContentScript, url: String): Boolean {
-        if (script.matches.none { matchPattern(it, url) }) return false
-        return script.excludeMatches.none { matchPattern(it, url) }
-    }
-
-    private fun matchPattern(pattern: String, url: String): Boolean {
-        if (pattern == "<all_urls>") return url.startsWith("http://") || url.startsWith("https://")
-        val regex = Pattern.quote(pattern).replace("\\*", "\\E.*\\Q")
-        return Regex("^$regex$").matches(url)
+        if (script.matches.none { ExtensionMatchPattern.matches(it, url) }) return false
+        return script.excludeMatches.none { ExtensionMatchPattern.matches(it, url) }
     }
 }
 
