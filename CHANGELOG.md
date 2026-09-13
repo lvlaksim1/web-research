@@ -3,6 +3,35 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v35-START -->
+## v35 — 2026-09-13T16:27:52Z
+
+- Release commit: `cbb758ca67834caab89fdb82d0cef268c272fd1f`
+- Artifact: `web-research-v35.apk`
+- SHA-256: `d92571e32d8d6ad793494241f8e49e2de20c76348c6123b8969517a59a65f8be`
+- Previous release: **v34**
+
+### Changes
+
+- ci: требовать русское описание релиза для Telegram
+- Add Chromium MV3 extension support
+- release: web research v35 [release]
+
+### Changed files
+
+- `.github/workflows/_release-apk.yml`
+- `.release/requests/v35.md`
+- `app/src/main/java/ru/evrasia/research/ExtensionCompatibilityChecker.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionContentScriptController.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionManager.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionManagerUi.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionManifest.kt`
+- `app/src/main/java/ru/evrasia/research/ExtensionRuntime.kt`
+- `app/src/main/java/ru/evrasia/research/NullableUriCompat.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchMenuController.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt`
+- `app/src/main/java/ru/evrasia/research/WebResearchWebViewController.kt`
+<!-- AUTO-CHANGELOG-v35-END -->
 <!-- AUTO-CHANGELOG-v34-START -->
 ## v34 — 2026-09-12T21:20:35Z
 
