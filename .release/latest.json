@@ -1,25 +1,33 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 44,
-  "tag": "v44",
-  "versionCode": 44,
-  "versionName": "v44",
+  "releaseNumber": 45,
+  "tag": "v45",
+  "versionCode": 45,
+  "versionName": "v45",
   "packageId": "web.research",
-  "commit": "931d9da2c06ce56f43e2b2373d55bb408bbd942d",
-  "artifact": "web-research-v44.apk",
-  "sha256": "bb6893f3d4f232138abbbb64dbdc07e68d0a5505deba8a88551f1f6615f93e2e",
-  "publishedAt": "2026-09-13T20:16:51Z",
-  "previousRelease": "v43",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v44",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v44/web-research-v44.apk",
+  "commit": "11eaad6dd51a76de7bafc934f322444fe1f1ad1c",
+  "artifact": "web-research-v45.apk",
+  "sha256": "76f3d594421486aba6d006995542bad689748879c27280ab3282ec9a76f81c6b",
+  "publishedAt": "2026-09-13T20:54:40Z",
+  "previousRelease": "v44",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v45",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v45/web-research-v45.apk",
   "commits": [
-    "Stage 4 advanced channels (#11)",
-    "release: web research v44 [release]"
+    "Stabilize forensic recording after v44 audit (#12)",
+    "release: web research v45 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v44.md",
+    ".release/requests/v45.md",
     "CAPTURE_MATRIX.md",
+    "app/src/main/java/ru/evrasia/research/CheckpointController.kt",
+    "app/src/main/java/ru/evrasia/research/CookieTraceEngine.kt",
+    "app/src/main/java/ru/evrasia/research/ForensicTimeline.kt",
+    "app/src/main/java/ru/evrasia/research/ResearchArchive.kt",
+    "app/src/main/java/ru/evrasia/research/ResearchArchiveExporter.kt",
     "app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt",
+    "app/src/main/java/ru/evrasia/research/WebCaptureController.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchScripts.kt",
+    "app/src/main/java/ru/evrasia/research/WebResearchV10Activity.kt",
     "app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt"
   ]
 }
