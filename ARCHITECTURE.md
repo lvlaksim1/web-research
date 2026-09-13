@@ -72,9 +72,23 @@ Forensic relations теперь извлекают JavaScript initiator из `in
 - после JS error / unhandled promise rejection;
 - при старте и остановке ZIP-recording.
 
-Лимиты checkpoint capture сбрасываются при старте каждой ZIP-записи: до 80 checkpoints и 40 viewport screenshots на recording window. Поэтому навигация до нажатия «Запись ZIP» больше не расходует ёмкость исследовательского окна. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
+Лимиты checkpoint capture сбрасываются при старте каждой ZIP-записи: до 80 checkpoints и 80 viewport screenshots на recording window. Поэтому навигация до нажатия «Запись ZIP» больше не расходует ёмкость исследовательского окна. Checkpoint state содержит cookies, bounded local/session storage и bounded DOM element summary; полный raw capture и финальный full snapshot остаются отдельными источниками.
 
 `checkpoints/index.json` описывает точки, а `checkpoint-diffs.json` содержит производные изменения cookies, storage и DOM между соседними checkpoints. Screenshot/state artifacts лежат в `checkpoints/<checkpointId>/`.
+
+## Runtime UI state
+
+Checkpoint и финальный snapshot дополнительно фиксируют runtime-состояние интерфейса, которое не обязано отражаться в HTML attributes:
+
+- `value`, `checked`, `indeterminate`, `selected`, `selectedIndex`, выбранные значения select;
+- focus и text-selection (`selectionStart`/`selectionEnd`/`selectionDirection`), а также document Selection;
+- scroll/viewport: `scrollX`, `scrollY`, `innerWidth/innerHeight`, `outerWidth/outerHeight`, `devicePixelRatio` и доступный `VisualViewport`;
+- inventory iframe/frame с geometry и same-origin признаком; для same-origin frame снимается ограниченный вложенный snapshot глубиной 1;
+- открытые (`open`) Shadow DOM roots с host metadata, focus, bounded HTML и bounded interactive elements.
+
+`checkpoint-diffs.json` сохраняет отдельные diff-разделы `formValues`, `formChecked`, `formSelected`, `focus`, `selection`, `viewport`, `frames`, `shadowDom` и details со значениями before/after.
+
+Closed Shadow DOM штатно не доступен через `element.shadowRoot`. v46 не перехватывает `attachShadow({mode:'closed'})`, потому что это уже инвазивное изменение runtime исследуемой страницы. Heap/extended JS runtime dump также не входит в штатный capture и остаётся возможным отдельным экспериментальным режимом.
 
 ## Advanced channels
 
@@ -118,7 +132,7 @@ Dedicated/Shared Worker runtime не перехватывается путём �
 
 `SessionManifestBuilder` строит только производные metadata экспорта: counters, completeness indicators, capture limits и warnings; он не изменяет raw archive.
 
-`network.har` строится только из HTTP evidence sources (`webview`, `fetch`, `xhr`, `resource-copy`, `replay`), а `api-summary.json` — из application/realtime API sources; snapshot/performance/checkpoint/error events туда больше не попадают.
+`network.har` строится только из HTTP evidence sources (`webview`, `fetch`, `xhr`, `resource-copy`), а `api-summary.json` — из application/realtime API sources; snapshot/performance/checkpoint/error events туда больше не попадают.
 
 `ResearchArchiveExporter` является отдельным read/export слоем и строит:
 
