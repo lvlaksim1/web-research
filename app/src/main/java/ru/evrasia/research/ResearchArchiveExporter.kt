@@ -96,11 +96,11 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
                 if (source == "navigation" || source == "history" || source == "user-action") {
                     r.optString("page", r.optString("url", "")).takeIf { it.startsWith("http") }?.let { routes.add(it) }
                 }
+                if (source !in setOf("fetch", "xhr", "replay", "websocket-open", "sse-open")) continue
                 if (!r.has("url")) continue
                 val url = r.optString("url", "")
                 val method = r.optString("method", "GET").ifBlank { "GET" }.uppercase(Locale.US)
                 if (!(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("ws://") || url.startsWith("wss://"))) continue
-                if (source in setOf("webview", "resource-copy", "script-archive", "console", "performance", "resource-timing")) continue
                 val key = "$method ${normalizeEndpoint(url)}"
                 val e = endpoints.getOrPut(key) {
                     JSONObject()
@@ -162,8 +162,11 @@ internal class ResearchArchiveExporter(private val archive: ResearchArchive) {
         synchronized(archive) {
             for (i in 0 until records.length()) {
                 val r = records.optJSONObject(i) ?: continue
+                val source = r.optString("source", "")
+                if (source !in setOf("webview", "fetch", "xhr", "resource-copy", "replay")) continue
                 if (!r.has("url")) continue
                 val url = r.optString("url", "about:blank").ifBlank { "about:blank" }
+                if (!(url.startsWith("http://") || url.startsWith("https://"))) continue
                 val method = r.optString("method", "GET").ifBlank { "GET" }
                 if (method == "WS") continue
                 val requestHeaders = when {
