@@ -94,6 +94,20 @@ Checkpoint и финальный snapshot дополнительно фикси�
 
 Closed Shadow DOM штатно не доступен через `element.shadowRoot`. v46 не перехватывает `attachShadow({mode:'closed'})`, потому что это уже инвазивное изменение runtime исследуемой страницы. Heap/extended JS runtime dump также не входит в штатный capture и остаётся возможным отдельным экспериментальным режимом.
 
+## Multi-context forensic capture (v48)
+
+v48 расширяет модель браузерной сессии с одного top-level WebView до иерархии browsing contexts: Browser Session → windowId → frameId. Каждое доступное raw event получает принадлежность к окну; browser-side evidence главного документа и дочерних frames дополнительно получает frameId. timeline.json сохраняет эти поля, а relations.json экспортирует самостоятельные массивы windows и frames.
+
+FrameCaptureController использует AndroidX WebKit 1.17.0. При поддержке JS_INJECTION_IN_FRAME_AND_WORLD устанавливаются два document-start слоя: page world для frame-local actions/history/fetch/XHR и isolated inspector world для bounded DOM/runtime snapshot и MutationObserver. Native WebMessageListener получает sourceOrigin и isMainFrame. Главный frame не дублируется новым recorder: для него остаётся полный v47 instrumentation.
+
+Если WebView runtime не поддерживает новую feature, остаётся v47 legacy frame inventory/snapshot. Режим фиксируется raw событием frame-capture-mode и в session-manifest.json; silent fallback не допускается. Frame-local snapshots сохраняются в browser/frames/<windowId>/<frameId>/.
+
+BrowserWindowController управляет несколькими одновременно живыми WebView. Каждый получает отдельный windowId и main frameId, но все используют общий ResearchArchive. Поддерживаются запросы сайта на новое окно через WebChromeClient, ручное создание окна, открытие ссылки в новом окне по долгому нажатию, переключение без уничтожения WebView и явное закрытие с WebView.destroy().
+
+События window-created, window-activated и window-closed сохраняют lifecycle/opener evidence. Snapshot каждого окна дополнительно хранится в browser/windows/<windowId>/page-snapshot.json. ZIP получает browsing-contexts.json; HAR сохраняет _windowId/_frameId, когда attribution известна. Native WebView interception гарантированно знает окно, но не всегда сообщает конкретный дочерний frame, поэтому неизвестный frameId не синтезируется.
+
+Closed Shadow DOM, heap dump и произвольные JS closures v48 автоматически не раскрывает.
+
 ## Advanced channels
 
 Этап 4 добавляет export-time инвентаризацию каналов, которые уже фиксируются разными слоями, и явно описывает недоступные WebView-поля вместо их имитации.
