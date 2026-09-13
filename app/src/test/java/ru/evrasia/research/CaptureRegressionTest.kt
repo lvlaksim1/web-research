@@ -134,6 +134,8 @@ class CaptureRegressionTest {
     fun recordingWindowKeepsEarlierSupportingAssetsAndFiltersCookieTrace() {
         val archive = ResearchArchive()
         val base = System.currentTimeMillis()
+        val startedAt = base + 10_000L
+        val endedAt = base + 11_000L
 
         archive.putScript("https://example.test/app.js", "console.log('support')".toByteArray())
         archive.putResource(
@@ -146,13 +148,13 @@ class CaptureRegressionTest {
             JSONObject()
                 .put("format", "evrasia-cookie-trace-v2")
                 .put("events", JSONArray()
-                    .put(JSONObject().put("time", base - 500L).put("name", "before"))
-                    .put(JSONObject().put("time", base + 500L).put("name", "inside")))
+                    .put(JSONObject().put("time", startedAt - 500L).put("name", "before"))
+                    .put(JSONObject().put("time", startedAt + 500L).put("name", "inside")))
                 .toString()
                 .toByteArray()
         )
 
-        val window = archive.snapshotWindow(base, base + 1_000L)
+        val window = archive.snapshotWindow(startedAt, endedAt)
 
         assertTrue(window.scripts.containsKey("https://example.test/app.js"))
         assertTrue(window.resources.containsKey("https://example.test/app.css"))
