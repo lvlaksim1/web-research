@@ -94,7 +94,10 @@ internal class WebCaptureController(
     fun capturePageSnapshot(onComplete: (() -> Unit)? = null) {
         val nativeCookies = CookieManager.getInstance().getCookie(web.url ?: "") ?: ""
         val requestId = if (onComplete != null) UUID.randomUUID().toString() else ""
-        if (onComplete != null) snapshotCallbacks[requestId] = onComplete
+        if (onComplete != null) {
+            snapshotCallbacks[requestId] = onComplete
+            web.postDelayed({ snapshotCallbacks.remove(requestId) }, 6_000L)
+        }
         web.evaluateJavascript(WebResearchScripts.fullSnapshot(nativeCookies, requestId), null)
     }
 
