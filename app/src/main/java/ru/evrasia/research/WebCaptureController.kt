@@ -23,7 +23,7 @@ internal class WebCaptureController(
     private val resourceCapture = WebResourceCapture(
         archive = archive,
         userAgent = userAgent,
-        record = { emit(it) },
+        record = { emitWindow(it) },
         onChanged = onChanged
     )
     private val checkpointController = CheckpointController(
@@ -32,7 +32,7 @@ internal class WebCaptureController(
         archive = archive,
         windowId = windowId,
         mainFrameId = mainFrameId,
-        record = { emit(it) },
+        record = { emitMain(it) },
         onChanged = onChanged
     )
     private val frameCaptureController = FrameCaptureController(
@@ -40,7 +40,7 @@ internal class WebCaptureController(
         windowId = windowId,
         mainFrameId = mainFrameId,
         archive = archive,
-        record = { emit(it) },
+        record = { emitWindow(it) },
         onChanged = onChanged
     )
 
@@ -116,9 +116,9 @@ internal class WebCaptureController(
         @JavascriptInterface
         fun record(json: String) {
             try {
-                emit(JSONObject(json))
+                emitMain(JSONObject(json))
             } catch (e: Exception) {
-                emit(
+                emitMain(
                     CaptureWarning.create(
                         code = "bridge_record_parse_failed",
                         message = "A browser-side event could not be parsed and was omitted.",
@@ -144,7 +144,7 @@ internal class WebCaptureController(
                 onSnapshot()
                 onChanged()
             } catch (e: Exception) {
-                emit(
+                emitMain(
                     CaptureWarning.create(
                         code = "snapshot_parse_failed",
                         message = "The page snapshot could not be parsed and was omitted.",
@@ -183,10 +183,14 @@ internal class WebCaptureController(
         }
     }
 
-    private fun emit(value: JSONObject) {
+    private fun emitWindow(value: JSONObject) {
         if (!value.has("windowId")) value.put("windowId", windowId)
-        if (!value.has("frameId")) value.put("frameId", mainFrameId)
         record(value)
+    }
+
+    private fun emitMain(value: JSONObject) {
+        if (!value.has("frameId")) value.put("frameId", mainFrameId)
+        emitWindow(value)
     }
 
     private fun collectChunk(key: String, index: Int, total: Int, chunk: String, script: Boolean) {
@@ -194,7 +198,7 @@ internal class WebCaptureController(
         if (total <= 0 || index !in 0 until total) {
             val message = "An invalid chunk index was received; the artifact cannot be reconstructed."
             if (script) archive.putScriptError(key, message)
-            emit(
+            emitMain(
                 CaptureWarning.create(
                     code = "chunk_invalid_index",
                     message = message,
@@ -222,7 +226,7 @@ internal class WebCaptureController(
             }
         } catch (e: Exception) {
             if (script) archive.putScriptError(key, e.toString())
-            emit(
+            emitMain(
                 CaptureWarning.create(
                     code = "chunk_assembly_failed",
                     message = "A chunked browser artifact could not be reconstructed.",
