@@ -19,7 +19,7 @@ internal class WebResearchExportController(
             if (activity.isFinishing || activity.isDestroyed) return@postDelayed
             val selectedArchive = archive.snapshotWindow(startedAt, endedAt)
             val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-            ResultDelivery.deliverGeneratedFileWithSystemChooser(activity, "Экспорт ZIP", "web-research-$stamp.zip", "application/zip") { output ->
+            ResultDelivery.deliverGeneratedFile(activity, "Экспорт ZIP", "web-research-$stamp.zip", "application/zip") { output ->
                 ResearchArchiveExporter(selectedArchive).writeZip(output, web.url ?: "")
             }
         }, 250L)

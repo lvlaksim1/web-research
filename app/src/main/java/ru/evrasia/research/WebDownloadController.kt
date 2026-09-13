@@ -2,12 +2,9 @@ package ru.evrasia.research
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
-import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
-import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -43,8 +40,7 @@ internal class WebDownloadController(
         val listenerContentLength: Long,
         val createdAt: Long = System.currentTimeMillis(),
         var output: OutputStream? = null,
-        var mediaUri: Uri? = null,
-        var fallbackFile: File? = null,
+        var preparedFile: File? = null,
         var mimeType: String = "application/octet-stream",
         var bytesWritten: Long = 0L,
         var started: Boolean = false
@@ -52,8 +48,7 @@ internal class WebDownloadController(
 
     private data class BlobDestination(
         val output: OutputStream,
-        val mediaUri: Uri? = null,
-        val fallbackFile: File? = null
+        val file: File
     )
 
     private val blobSessions = ConcurrentHashMap<String, BlobSession>()
@@ -209,8 +204,7 @@ internal class WebDownloadController(
                         ?: "application/octet-stream"
                     val destination = createBlobDestination(session.fileName, effectiveMime)
                     session.output = destination.output
-                    session.mediaUri = destination.mediaUri
-                    session.fallbackFile = destination.fallbackFile
+                    session.preparedFile = destination.file
                     session.mimeType = effectiveMime
                     session.started = true
                     true
@@ -263,22 +257,22 @@ internal class WebDownloadController(
                     session.output?.flush()
                     session.output?.close()
                     session.output = null
-                    publishBlobDestination(session)
+                    val file = session.preparedFile ?: error("Prepared blob file is unavailable")
                     blobSessions.remove(token)
                     recordDownload(
                         session.url,
                         session.fileName,
                         session.mimeType,
                         session.bytesWritten,
-                        "saved"
+                        "prepared"
                     )
                     activity.runOnUiThread {
-                        val message = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            "Файл сохранён в Загрузки: ${session.fileName}"
-                        } else {
-                            "Файл сохранён: ${session.fallbackFile?.absolutePath ?: session.fileName}"
-                        }
-                        Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+                        ResultDelivery.deliverExistingFile(
+                            activity = activity,
+                            title = if (session.mimeType.equals("application/zip", true) || session.fileName.endsWith(".zip", true)) "Экспорт ZIP" else "Загрузка файла",
+                            file = file,
+                            mime = session.mimeType
+                        )
                     }
                     true
                 } catch (e: Exception) {
@@ -296,38 +290,9 @@ internal class WebDownloadController(
     }
 
     private fun createBlobDestination(fileName: String, mimeType: String): BlobDestination {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, mimeType)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
-            val resolver = activity.contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: error("MediaStore could not create a download")
-            val output = resolver.openOutputStream(uri, "w")
-            if (output == null) {
-                resolver.delete(uri, null, null)
-                error("MediaStore output stream is unavailable")
-            }
-            return BlobDestination(output = output, mediaUri = uri)
-        }
-
-        val folder = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            ?: File(activity.filesDir, "downloads")
-        folder.mkdirs()
-        val file = uniqueFile(folder, fileName)
-        return BlobDestination(output = file.outputStream(), fallbackFile = file)
-    }
-
-    private fun publishBlobDestination(session: BlobSession) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val uri = session.mediaUri ?: return
-        val values = ContentValues().apply {
-            put(MediaStore.Downloads.IS_PENDING, 0)
-        }
-        activity.contentResolver.update(uri, values, null, null)
+        val folder = File(activity.cacheDir, "exports").apply { mkdirs() }
+        val file = uniqueFile(folder, ensureMimeExtension(fileName, mimeType))
+        return BlobDestination(output = file.outputStream(), file = file)
     }
 
     private fun failBlobSession(session: BlobSession, error: String) {
@@ -339,11 +304,7 @@ internal class WebDownloadController(
             }
             session.output = null
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    session.mediaUri?.let { activity.contentResolver.delete(it, null, null) }
-                } else {
-                    session.fallbackFile?.delete()
-                }
+                session.preparedFile?.delete()
             } catch (_: Exception) {
             }
 
@@ -356,7 +317,7 @@ internal class WebDownloadController(
                 error = error
             )
             activity.runOnUiThread {
-                Toast.makeText(activity, "Не удалось сохранить blob-файл", Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, "Не удалось подготовить blob-файл", Toast.LENGTH_LONG).show()
             }
         }
     }

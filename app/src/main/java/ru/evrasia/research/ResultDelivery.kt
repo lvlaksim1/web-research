@@ -70,15 +70,25 @@ internal object ResultDelivery {
         showChoice(activity, prepared)
     }
 
-    fun deliverGeneratedFileWithSystemChooser(
+    fun deliverExistingFile(
         activity: Activity,
         title: String,
-        fileName: String,
-        mime: String,
-        writer: (OutputStream) -> Unit
+        file: File,
+        mime: String
     ) {
-        val prepared = prepare(activity, title, fileName, mime, null, writer) ?: return
-        share(activity, prepared, chooserTitle = "Выберите действие")
+        if (!file.isFile) {
+            Toast.makeText(activity, "Файл не найден", Toast.LENGTH_LONG).show()
+            return
+        }
+        showChoice(
+            activity,
+            Prepared(
+                title = title,
+                file = file,
+                mime = mime.ifBlank { "application/octet-stream" },
+                clipboardText = null
+            )
+        )
     }
 
     fun defaultFileName(label: String, value: String = ""): String {
@@ -233,7 +243,7 @@ internal object ResultDelivery {
         }
     }
 
-    private fun share(activity: Activity, prepared: Prepared, chooserTitle: String = "Отправить ${prepared.title}") {
+    private fun share(activity: Activity, prepared: Prepared) {
         try {
             val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.files", prepared.file)
             val send = Intent(Intent.ACTION_SEND).apply {
@@ -242,9 +252,9 @@ internal object ResultDelivery {
                 clipData = ClipData.newUri(activity.contentResolver, prepared.title, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(Intent.createChooser(send, chooserTitle))
+            activity.startActivity(Intent.createChooser(send, "Отправить ${prepared.title}"))
         } catch (_: Exception) {
-            Toast.makeText(activity, "Не удалось открыть системное меню действий", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, "Не удалось открыть меню отправки", Toast.LENGTH_LONG).show()
         }
     }
 
