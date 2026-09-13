@@ -1,24 +1,25 @@
 {
   "schemaVersion": 1,
-  "releaseNumber": 43,
-  "tag": "v43",
-  "versionCode": 43,
-  "versionName": "v43",
+  "releaseNumber": 44,
+  "tag": "v44",
+  "versionCode": 44,
+  "versionName": "v44",
   "packageId": "web.research",
-  "commit": "3c6ab2d9573e2152f7ae0fc22c8ce8612450e796",
-  "artifact": "web-research-v43.apk",
-  "sha256": "fb9e835ee6cc8f4d2e334365d8e435fe75c0500c6c54784fc0c1d10e844e57d5",
-  "publishedAt": "2026-09-13T20:08:18Z",
-  "previousRelease": "v42",
-  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v43",
-  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v43/web-research-v43.apk",
+  "commit": "931d9da2c06ce56f43e2b2373d55bb408bbd942d",
+  "artifact": "web-research-v44.apk",
+  "sha256": "bb6893f3d4f232138abbbb64dbdc07e68d0a5505deba8a88551f1f6615f93e2e",
+  "publishedAt": "2026-09-13T20:16:51Z",
+  "previousRelease": "v43",
+  "releaseUrl": "https://github.com/lvlaksim1/web-research/releases/tag/v44",
+  "artifactUrl": "https://github.com/lvlaksim1/web-research/releases/download/v44/web-research-v44.apk",
   "commits": [
-    "Stage 3: add JS causality relations",
-    "release: web research v43 [release]"
+    "Stage 4 advanced channels (#11)",
+    "release: web research v44 [release]"
   ],
   "changedFiles": [
-    ".release/requests/v43.md",
+    ".release/requests/v44.md",
     "CAPTURE_MATRIX.md",
-    "app/src/main/java/ru/evrasia/research/ForensicTimeline.kt"
+    "app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt",
+    "app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt"
   ]
 }

@@ -3,6 +3,26 @@
 История опубликованных релизов. Новые release-блоки добавляются автоматически сверху; ручной текст вне автоматически управляемых блоков сохраняется.
 
 <!-- AUTO-CHANGELOG-INSERT -->
+<!-- AUTO-CHANGELOG-v44-START -->
+## v44 — 2026-09-13T20:16:51Z
+
+- Release commit: `931d9da2c06ce56f43e2b2373d55bb408bbd942d`
+- Artifact: `web-research-v44.apk`
+- SHA-256: `bb6893f3d4f232138abbbb64dbdc07e68d0a5505deba8a88551f1f6615f93e2e`
+- Previous release: **v43**
+
+### Changes
+
+- Stage 4 advanced channels (#11)
+- release: web research v44 [release]
+
+### Changed files
+
+- `.release/requests/v44.md`
+- `CAPTURE_MATRIX.md`
+- `app/src/main/java/ru/evrasia/research/SessionManifestBuilder.kt`
+- `app/src/test/java/ru/evrasia/research/CaptureRegressionTest.kt`
+<!-- AUTO-CHANGELOG-v44-END -->
 <!-- AUTO-CHANGELOG-v43-START -->
 ## v43 — 2026-09-13T20:08:18Z
 
