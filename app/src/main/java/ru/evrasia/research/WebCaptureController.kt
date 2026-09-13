@@ -30,6 +30,8 @@ internal class WebCaptureController(
         activity = activity,
         web = web,
         archive = archive,
+        windowId = windowId,
+        mainFrameId = mainFrameId,
         record = { emit(it) },
         onChanged = onChanged
     )
