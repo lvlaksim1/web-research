@@ -311,14 +311,16 @@ internal object ForensicTimelineExport {
                     if (record.has("status")) request.put("status", record.optInt("status"))
                     val relatedActionId = record.optString("relatedActionId", "")
                     if (relatedActionId.isNotBlank()) {
+                        val actionRelation = record.optString("actionRelation", "temporal-nearest")
                         request.put("relatedActionId", relatedActionId)
+                        request.put("actionRelation", actionRelation)
                         addLink(
                             links,
                             linkKeys,
                             relatedActionId,
                             requestId,
                             "action-to-request",
-                            record.optString("actionRelation", "temporal-nearest")
+                            actionRelation
                         )
                     }
                     if (source == "fetch" || source == "xhr") {
@@ -499,7 +501,14 @@ internal object ForensicTimelineExport {
     private fun initiatorFrame(stack: String): String {
         if (stack.isBlank()) return ""
         val frames = stack.lines().map { it.trim() }.filter { it.startsWith("at ") }
-        return frames.firstOrNull { !it.contains("wrapped", true) && !it.contains("__wr", true) }
+        fun instrumentationFrame(frame: String): Boolean =
+            frame.contains("XP.send", true) ||
+                frame.contains("__wr", true) ||
+                (frame.contains("wrapped", true) && !frame.contains("http://") && !frame.contains("https://") && !frame.contains("blob:"))
+        return frames.firstOrNull {
+            !instrumentationFrame(it) &&
+                (it.contains("http://") || it.contains("https://") || it.contains("blob:"))
+        } ?: frames.firstOrNull { !instrumentationFrame(it) }
             ?: frames.firstOrNull().orEmpty()
     }
 
