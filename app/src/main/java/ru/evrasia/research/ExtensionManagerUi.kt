@@ -243,7 +243,11 @@ internal class ExtensionManagerUi(
         }
     }
 
-    private fun primaryButton(label: String, palette: WebUiTheme.Palette) = Button(activity).apply {
+    private fun primaryButton(
+        label: String,
+        palette: WebUiTheme.Palette,
+        click: () -> Unit
+    ) = Button(activity).apply {
         text = label
         isAllCaps = false
         textSize = 13.5f
@@ -254,6 +258,7 @@ internal class ExtensionManagerUi(
         minHeight = 0
         minimumHeight = 0
         background = rounded(palette.accent, 15f, palette.accent)
+        setOnClickListener { click() }
     }
 
     private fun iconButton(
