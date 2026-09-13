@@ -310,6 +310,9 @@ internal object ForensicTimelineExport {
                             .put("firstTime", time)
                             .put("sourceOrigin", record.optString("sourceOrigin", ""))
                             .put("isMainFrame", record.optBoolean("isMainFrame", frameId.endsWith("-main")))
+                            .put("frameIdentityMethod", record.optString("frameIdentityMethod", ""))
+                            .put("parentFrameId", JSONObject.NULL)
+                            .put("parentRelation", "unavailable-via-current-webview-api")
                     }
                     frame.put("lastEventId", eventId)
                     frame.put("lastTime", time)
@@ -526,6 +529,7 @@ internal object ForensicTimelineExport {
         copyIfPresent(record, out, "isMainFrame")
         copyIfPresent(record, out, "executionWorld")
         copyIfPresent(record, out, "frameCaptureMode")
+        copyIfPresent(record, out, "frameIdentityMethod")
         copyIfPresent(record, out, "stateArtifact")
         record.optJSONObject("target")?.let { out.put("target", JSONObject(it.toString())) }
         return out
