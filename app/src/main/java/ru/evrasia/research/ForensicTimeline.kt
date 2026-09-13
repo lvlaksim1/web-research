@@ -401,6 +401,21 @@ internal object ForensicTimelineExport {
             }
         }
 
+        requests.values.forEach { request ->
+            val requestId = request.optString("requestId", "")
+            val initiatorId = request.optString("initiatorId", "")
+            if (initiatorId.isNotBlank()) {
+                causalityChains.put(
+                    JSONObject()
+                        .put("relatedActionId", request.optString("relatedActionId", ""))
+                        .put("actionRelation", request.optString("actionRelation", ""))
+                        .put("initiatorId", initiatorId)
+                        .put("requestId", requestId)
+                        .put("mutationIds", JSONArray(mutationsByRequest[requestId].orEmpty()))
+                )
+            }
+        }
+
         return JSONObject()
             .put("schemaVersion", 1)
             .put("format", "web-research-forensic-relations-v1")
