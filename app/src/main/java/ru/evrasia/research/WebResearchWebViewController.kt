@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Message
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -16,6 +17,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
+import org.json.JSONTokener
 
 internal class WebResearchWebViewController(
     private val activity: AppCompatActivity,
@@ -34,11 +36,14 @@ internal class WebResearchWebViewController(
     private var mobileUserAgent = ""
     private var desktopUserAgent = ""
     private var desktopMode = false
+    private var lastSyncedPageUrl = ""
     private val extensionRuntime = ExtensionRuntime(activity, web)
     private val extensionScripts = ExtensionContentScriptController(web)
+    private val navigationBridge = NavigationBridge()
 
     fun install() {
         initializeBrowserMode()
+        web.addJavascriptInterface(navigationBridge, "WebResearchNavigationBridge")
         extensionRuntime.installBridge()
         extensionScripts.replaceInstalled(extensionManager.installed())
         WebDownloadController(activity, web, web.settings.userAgentString, record).install()
@@ -68,18 +73,24 @@ internal class WebResearchWebViewController(
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                onLoadingChanged(true); onPageUrlChanged(url)
-                handler.postDelayed({ extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_start") }, 20)
+                onLoadingChanged(true)
+                syncPageUrl(url)
+                handler.postDelayed({ installUrlObserver(); extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_start") }, 20)
                 handler.postDelayed({ captureController.ensureInstrumentation() }, 100)
-                handler.postDelayed({ extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_end") }, 350)
+                handler.postDelayed({ installUrlObserver(); extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_end") }, 350)
                 handler.postDelayed({ captureController.ensureInstrumentation() }, 350)
                 if (desktopMode) { handler.postDelayed({ applyDesktopViewport() }, 150); handler.postDelayed({ applyDesktopViewport() }, 500) }
             }
+            override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                if (!url.isNullOrBlank()) syncPageUrl(url)
+            }
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
-                swipeRefresh.isRefreshing = false; address.setText(url); onPageUrlChanged(url); onLoadingChanged(false)
+                swipeRefresh.isRefreshing = false; syncPageUrl(url); onLoadingChanged(false)
                 record(JSONObject().put("source", "navigation").put("time", System.currentTimeMillis()).put("url", url).put("page", url).put("method", "GET"))
                 if (desktopMode) { applyDesktopViewport(); handler.postDelayed({ applyDesktopViewport() }, 250); handler.postDelayed({ applyDesktopViewport() }, 900) }
+                installUrlObserver()
                 extensionRuntime.bootstrap(); extensionScripts.inject(url, "document_idle")
                 captureController.ensureInstrumentation(); captureController.captureLightPageSnapshot()
             }
@@ -92,6 +103,61 @@ internal class WebResearchWebViewController(
                 return super.shouldInterceptRequest(view, request)
             }
         }
+    }
+
+    private inner class NavigationBridge {
+        @JavascriptInterface
+        fun changed() {
+            activity.runOnUiThread { readActualPageUrl() }
+        }
+    }
+
+    private fun installUrlObserver() {
+        val script = """(function(){
+            try {
+                if (window.__webResearchUrlObserverInstalled) return;
+                window.__webResearchUrlObserverInstalled = true;
+                var last = String(location.href);
+                var notify = function() {
+                    var current = String(location.href);
+                    if (current === last) return;
+                    last = current;
+                    try { window.WebResearchNavigationBridge.changed(); } catch (_) {}
+                };
+                var wrap = function(name) {
+                    try {
+                        var original = history[name];
+                        if (typeof original !== 'function') return;
+                        history[name] = function() {
+                            var result = original.apply(this, arguments);
+                            setTimeout(notify, 0);
+                            return result;
+                        };
+                    } catch (_) {}
+                };
+                wrap('pushState');
+                wrap('replaceState');
+                addEventListener('popstate', notify, true);
+                addEventListener('hashchange', notify, true);
+                setInterval(notify, 750);
+                try { window.WebResearchNavigationBridge.changed(); } catch (_) {}
+            } catch (_) {}
+        })();"""
+        web.evaluateJavascript(script, null)
+    }
+
+    private fun readActualPageUrl() {
+        if (activity.isFinishing || activity.isDestroyed) return
+        web.evaluateJavascript("(function(){try{return String(location.href)}catch(e){return ''}})()") { result ->
+            val actual = runCatching { JSONTokener(result).nextValue() as? String }.getOrNull().orEmpty()
+            if (actual.startsWith("http://", true) || actual.startsWith("https://", true)) syncPageUrl(actual)
+        }
+    }
+
+    private fun syncPageUrl(url: String) {
+        if (url.isBlank() || url == lastSyncedPageUrl) return
+        lastSyncedPageUrl = url
+        onPageUrlChanged(url)
     }
 
     fun reloadExtensions(reloadPage: Boolean = false) {
