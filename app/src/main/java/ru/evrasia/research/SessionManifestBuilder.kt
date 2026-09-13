@@ -56,6 +56,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
         val indexedDbArtifacts = archive.extraArtifacts.keys.count { it.startsWith("indexeddb-") }
         val cacheStorageArtifacts = archive.extraArtifacts.keys.count { it.startsWith("cache-") }
         val scriptRedirectArtifacts = archive.extraArtifacts.keys.count { it.startsWith("script-redirect-") }
+        val checkpointStateArtifacts = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/state.json") }
+        val checkpointScreenshots = archive.extraArtifacts.keys.count { it.startsWith("checkpoints/") && it.endsWith("/screenshot.jpg") }
+        val checkpointEvents = sourceCounts["checkpoint"] ?: 0
 
         val fullSnapshotCaptured = snapshot.optBoolean("fullSnapshot", false)
         val pageHtmlCaptured = snapshot.optString("html", "").isNotEmpty()
@@ -100,6 +103,8 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("cacheStorageSnapshotCaptured", snapshot.has("cacheStorage"))
             .put("indexedDbSnapshotCaptured", snapshot.has("indexedDB"))
             .put("resourceTimingSnapshotCaptured", snapshot.has("resources"))
+            .put("checkpointsCaptured", checkpointEvents > 0)
+            .put("checkpointDiffsAvailable", checkpointEvents > 1)
 
         val counters = JSONObject()
             .put("rawEvents", archive.records.length())
@@ -119,6 +124,9 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("indexedDbArtifacts", indexedDbArtifacts)
             .put("cacheStorageArtifacts", cacheStorageArtifacts)
             .put("scriptRedirectArtifacts", scriptRedirectArtifacts)
+            .put("checkpointEvents", checkpointEvents)
+            .put("checkpointStateArtifacts", checkpointStateArtifacts)
+            .put("checkpointScreenshots", checkpointScreenshots)
             .put("warnings", warnings.length())
             .put("forensicEventIds", eventIds)
             .put("forensicActionIds", actionIds)
@@ -143,6 +151,12 @@ internal class SessionManifestBuilder(private val archive: ResearchArchive) {
             .put("lightSnapshotElements", 2500)
             .put("bridgeChunkChars", 100000)
             .put("derivativeRedirectHops", 10)
+            .put("checkpointsPerSession", 40)
+            .put("checkpointScreenshotsPerSession", 24)
+            .put("checkpointStateChars", 1500000)
+            .put("checkpointDomElements", 500)
+            .put("checkpointStorageKeys", 50)
+            .put("checkpointStorageValueChars", 4096)
 
         return JSONObject()
             .put("schemaVersion", 1)

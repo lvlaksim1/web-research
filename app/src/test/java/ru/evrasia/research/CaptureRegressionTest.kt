@@ -70,6 +70,58 @@ class CaptureRegressionTest {
     }
 
     @Test
+    fun checkpointDiffsTrackCookieStorageAndDomChanges() {
+        val archive = ResearchArchive()
+        val before = JSONObject()
+            .put("time", 1_000L)
+            .put("url", "https://example.test/app")
+            .put("title", "Before")
+            .put("cookie", "sid=one")
+            .put("nativeCookie", "sid=one")
+            .put("localStorage", JSONObject().put("values", JSONObject().put("a", "1")))
+            .put("sessionStorage", JSONObject().put("values", JSONObject().put("step", "one")))
+            .put("dom", JSONObject().put("elements", JSONArray()
+                .put(JSONObject().put("key", "id:save").put("text", "Save"))))
+        val after = JSONObject()
+            .put("time", 2_000L)
+            .put("url", "https://example.test/app")
+            .put("title", "After")
+            .put("cookie", "sid=two; token=abc")
+            .put("nativeCookie", "sid=two; token=abc")
+            .put("localStorage", JSONObject().put("values", JSONObject().put("a", "2").put("b", "3")))
+            .put("sessionStorage", JSONObject().put("values", JSONObject().put("step", "two")))
+            .put("dom", JSONObject().put("elements", JSONArray()
+                .put(JSONObject().put("key", "id:save").put("text", "Saved"))
+                .put(JSONObject().put("key", "id:done").put("text", "Done"))))
+
+        val beforeId = archive.addCheckpoint("before-action", before, null)
+        val afterId = archive.addCheckpoint("after-action", after, byteArrayOf(1, 2, 3))
+
+        assertEquals("checkpoint-00000001", beforeId)
+        assertEquals("checkpoint-00000002", afterId)
+        val index = CheckpointExport.buildIndex(archive)
+        assertEquals(2, index.getInt("count"))
+        val diffs = CheckpointExport.buildDiffs(archive).getJSONArray("diffs")
+        assertEquals(1, diffs.length())
+        val diff = diffs.getJSONObject(0)
+        assertTrue(diff.getJSONObject("documentCookies").getJSONArray("changed").toString().contains("sid"))
+        assertTrue(diff.getJSONObject("documentCookies").getJSONArray("added").toString().contains("token"))
+        assertTrue(diff.getJSONObject("localStorage").getJSONArray("changed").toString().contains("a"))
+        assertTrue(diff.getJSONObject("localStorage").getJSONArray("added").toString().contains("b"))
+        assertTrue(diff.getJSONObject("dom").getJSONArray("changed").toString().contains("id:save"))
+        assertTrue(diff.getJSONObject("dom").getJSONArray("added").toString().contains("id:done"))
+
+        val output = ByteArrayOutputStream()
+        ResearchArchiveExporter(archive).writeZip(output, "https://example.test/app")
+        val entries = unzip(output.toByteArray())
+        assertTrue(entries.containsKey("checkpoints/index.json"))
+        assertTrue(entries.containsKey("checkpoint-diffs.json"))
+        assertTrue(entries.containsKey("checkpoints/$beforeId/state.json"))
+        assertTrue(entries.containsKey("checkpoints/$afterId/state.json"))
+        assertTrue(entries.containsKey("checkpoints/$afterId/screenshot.jpg"))
+    }
+
+    @Test
     fun rawRecordIsNotMutatedByDebuggerNormalization() {
         val raw = JSONArray()
         val record = JSONObject()
@@ -243,6 +295,8 @@ class CaptureRegressionTest {
             "session-manifest.json",
             "timeline.json",
             "relations.json",
+            "checkpoints/index.json",
+            "checkpoint-diffs.json",
             "raw-events.json",
             "network.har",
             "api-summary.json",

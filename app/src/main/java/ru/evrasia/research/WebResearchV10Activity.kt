@@ -298,12 +298,14 @@ class WebResearchV10Activity : AppCompatActivity() {
             zipRecordingStartedAt = System.currentTimeMillis()
             WebResearchBrowserLayout.setZipRecording(this, browserViews, true)
             zipButton.contentDescription = "Остановить запись ZIP"
+            if (::captureController.isInitialized) captureController.captureCheckpoint("recording-start")
         } else {
             val endedAt = System.currentTimeMillis()
             zipRecordingStartedAt = null
             WebResearchBrowserLayout.setZipRecording(this, browserViews, false)
             zipButton.contentDescription = "Начать запись ZIP"
-            exportController.exportWindow(startedAt, endedAt)
+            if (::captureController.isInitialized) captureController.captureCheckpoint("recording-stop")
+            exportController.exportWindow(startedAt, endedAt + 750L)
         }
     }
 

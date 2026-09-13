@@ -115,6 +115,10 @@ internal class ForensicTimeline(
                     record.put("checkpointId", id("checkpoint", checkpointCounter))
                 }
                 linkNearestAction(record, eventTime)
+                nearestApplicationRequest(eventTime)?.let {
+                    record.put("relatedRequestId", it.id)
+                    record.put("requestRelation", "temporal-nearest")
+                }
             }
 
             "navigation", "history", "websocket-open", "websocket-send", "sse-open" -> {

@@ -32,6 +32,44 @@ class ResearchArchive internal constructor(
         recordCapturedAt.add(System.currentTimeMillis())
     }
 
+    @Synchronized fun addCheckpoint(reason: String, state: JSONObject, screenshot: ByteArray?): String {
+        val capturedAt = System.currentTimeMillis()
+        val event = JSONObject()
+            .put("source", "checkpoint")
+            .put("time", state.optLong("time", capturedAt))
+            .put("reason", reason)
+            .put("page", state.optString("url", ""))
+            .put("title", state.optString("title", ""))
+
+        state.optJSONObject("trigger")?.let { trigger ->
+            if (trigger.has("method")) event.put("method", trigger.optString("method", ""))
+            if (trigger.has("url")) event.put("url", trigger.optString("url", ""))
+            if (trigger.has("status")) event.put("status", trigger.optInt("status", 0))
+            if (trigger.has("action")) event.put("action", trigger.optString("action", ""))
+        }
+
+        forensicTimeline.annotate(event)
+        val checkpointId = event.getString("checkpointId")
+        val statePath = "checkpoints/$checkpointId/state.json"
+        val screenshotPath = if (screenshot != null) "checkpoints/$checkpointId/screenshot.jpg" else ""
+
+        state.put("checkpointId", checkpointId)
+        state.put("reason", reason)
+        event.put("stateArtifact", statePath)
+        if (screenshotPath.isNotBlank()) event.put("screenshotArtifact", screenshotPath)
+
+        NetworkRecordPipeline.appendRawAndDebug(records, event)
+        recordCapturedAt.add(capturedAt)
+
+        artifactCapturedAt[statePath] = capturedAt
+        extraArtifacts[statePath] = state.toString().toByteArray(Charsets.UTF_8)
+        if (screenshot != null) {
+            artifactCapturedAt[screenshotPath] = capturedAt
+            extraArtifacts[screenshotPath] = screenshot
+        }
+        return checkpointId
+    }
+
     fun putScript(url: String, bytes: ByteArray) {
         scriptCapturedAt[url] = System.currentTimeMillis()
         val previous = scripts.put(url, bytes)
